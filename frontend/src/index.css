@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-100 font-sans text-slate-800 antialiased;
+  }
+
+  /* A visible focus ring on every interactive element, not just the
+     browser default, so keyboard navigation is always traceable. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-brand-600 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-card;
+  }
+
+  .card-header {
+    @apply flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-slate-700;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900
+           placeholder:text-slate-400 disabled:cursor-not-allowed disabled:bg-slate-50
+           disabled:text-slate-500 aria-[invalid=true]:border-risk-high;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2
+           text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-600 text-white hover:bg-brand-700;
+  }
+
+  .btn-secondary {
+    @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100;
+  }
+
+  .btn-danger {
+    @apply btn bg-risk-high text-white hover:brightness-95;
+  }
+
+  .th {
+    @apply whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase
+           tracking-wide text-slate-500;
+  }
+
+  .td {
+    @apply px-4 py-3 text-sm text-slate-700;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold;
+  }
+}
+
+/* Recharts: keep the focus outline off the SVG wrapper, which Recharts
+   makes focusable but which has no meaningful focus state of its own. */
+.recharts-wrapper:focus,
+.recharts-surface:focus {
+  outline: none;
+}
