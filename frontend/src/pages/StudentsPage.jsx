@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { GraduationCap, Plus, UserCheck, UserX } from 'lucide-react'
+import { Plus, UserCheck, UserX } from 'lucide-react'
 
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'

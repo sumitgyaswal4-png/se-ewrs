@@ -1,7 +1,7 @@
 """Intervention tracking: counselling, tutoring and follow-up records."""
 
 from datetime import date
-from typing import Annotated, List, Optional
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import func, or_, select

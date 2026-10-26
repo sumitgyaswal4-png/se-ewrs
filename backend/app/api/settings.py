@@ -14,7 +14,7 @@ from app.core.permissions import (
     P_SETTINGS_WRITE,
 )
 from app.models import AuditLog, SystemSetting, User
-from app.schemas.common import Message, Page
+from app.schemas.common import Page
 from app.services import audit
 from app.services.risk_engine import RiskConfig
 from pydantic import BaseModel, ConfigDict, Field

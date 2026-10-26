@@ -482,7 +482,7 @@ export default function AlertsPage() {
                   </>
                 ) : (
                   <p className="mt-1.5 text-sm text-slate-600">
-                    This alert is resolved, which is final. If the student's risk rises
+                    This alert is resolved, which is final. If the student&rsquo;s risk rises
                     again a fresh alert is raised automatically.
                   </p>
                 )}

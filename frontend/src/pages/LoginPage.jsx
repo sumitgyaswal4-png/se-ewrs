@@ -73,7 +73,7 @@ export default function LoginPage() {
     }
   }
 
-  function useDemoAccount(email) {
+  function fillDemoAccount(email) {
     setForm({ email, password: DEMO_PASSWORD })
     setTouched({})
     setServerError(null)
@@ -259,7 +259,7 @@ export default function LoginPage() {
                   </span>
                   <button
                     type="button"
-                    onClick={() => useDemoAccount(account.email)}
+                    onClick={() => fillDemoAccount(account.email)}
                     className="btn-ghost shrink-0 px-2 py-1 text-xs"
                   >
                     Use

@@ -12,7 +12,7 @@ from typing import Annotated, Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy import Select, case, func, select
+from sqlalchemy import case, func, select
 
 from app.api.deps import CurrentUser, DbSession, require_permissions
 from app.core.exceptions import ValidationError
@@ -41,11 +41,8 @@ from app.schemas.reports import (
     TrendPoint,
 )
 from app.services.queries import (
-    academics_sq,
-    attendance_sq,
     course_stats_sq,
     latest_risk_sq,
-    open_alert_sq,
     risk_summary_select,
 )
 

@@ -16,7 +16,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useToast } from '../hooks/useToast.jsx'
 import { riskApi } from '../services/endpoints.js'
 import { RISK_COLORS } from '../utils/charts.js'
-import { dateOnly, dateTime, percent, relativeDays, score, splitFactors } from '../utils/format.js'
+import { dateOnly, relativeDays, score, splitFactors } from '../utils/format.js'
 
 export default function RiskDetailPage() {
   const { enrollmentId } = useParams()

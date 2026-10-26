@@ -23,7 +23,6 @@ from sqlalchemy import Select, and_, case, func, literal, select
 from sqlalchemy.sql import Subquery
 
 from app.models import (
-    Assessment,
     AssessmentResult,
     AttendanceRecord,
     Course,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BookOpen, Plus, UserPlus, Users, X } from 'lucide-react'
+import { Plus, UserPlus, Users, X } from 'lucide-react'
 
 import Badge from '../components/Badge.jsx'
 import Card from '../components/Card.jsx'

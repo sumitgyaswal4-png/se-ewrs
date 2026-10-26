@@ -804,38 +804,76 @@ cd backend && ./.venv/bin/python -m pytest
 
 Stated plainly, because a claim in a README is worth nothing without it.
 
-**Verified by running it:**
+### Verified by running it
 
-- 406 backend tests pass; 83% coverage
-- 83 frontend tests pass
-- The backend starts, serves 62 routes, and reports database connectivity
-- The React app builds, and every one of the 17 pages renders in a real
-  browser (Chrome via Playwright) with **no console errors, page errors
-  or failed requests**
-- End-to-end over real HTTP: sign-in for all five roles, role-based
-  redirection, the dashboard's figures, the risk table and detail,
-  alert transitions, duplicate prevention, marks validation, all seven
-  reports, CSV export, and RBAC returning 403 where it should
-- The risk arithmetic: the API's component contributions sum to the
-  score it reports
-- The demo seed produces the documented spread of low/medium/high and
-  unscored profiles
-- Responsive layout down to 390px with no horizontal overflow
+**Against real MySQL 8.0.46** (default `sql_mode`, which includes
+`ONLY_FULL_GROUP_BY` — the strictest setting, and the one most `GROUP BY`
+queries fail under):
 
-**Not verified in this environment:** the SQL scripts have **not** been
-executed against a live MySQL 8 server — no MySQL credentials were
-available here, so the backend was verified against SQLite through the
-same SQLAlchemy layer. The schema, views, procedures and triggers are
-written for MySQL 8.0.16+ and use features (`STORED` generated columns,
-`SIGNAL`, `DELIMITER` blocks, cursors) that SQLite does not have, so they
-are exercised only when you run them. **Run the five scripts in §12 and
-report any error** — each script prints a success line when it completes.
+- All five scripts load with **zero errors**, in the documented order,
+  each printing its success line. `seed.sql` loads in about 9 seconds.
+- The objects they create: **16 tables, 12 views, 6 procedures, 3
+  functions, 12 triggers, 27 foreign keys, 14 CHECK constraints, 12
+  unique keys, 77 indexes**.
+- All 12 views return rows.
+- All 15 queries in `analytics_queries.sql` run cleanly.
+- `EXPLAIN` confirms the composite index is used: the risk engine's
+  hottest predicate picks `ix_lms_enrollment_time` as a covering range
+  scan touching 26 rows out of 5,414.
 
-The ORM models mirror `schema.sql` table for table and were verified to
-create successfully on both engines, and `database/analytics_queries.sql`
-is the MySQL-side equivalent of the aggregates the API computes.
+**The constraints and triggers actually fire:**
 
----
+| Check | Result |
+|---|---|
+| Second open alert for one enrolment | `ERROR 1062 Duplicate entry '4-1' for key 'uq_alert_one_active_per_enrollment'` |
+| Two resolved alerts + one open, same enrolment | accepted — 3 rows, 1 open (repeated NULLs behave as designed) |
+| `INSERT` marks without supplying `percentage` | trigger derives `15.00/20.00 → 75.00` |
+| Marks above `max_marks` | `ERROR 1644 assessment_results: marks_obtained exceeds max_marks` |
+| Negative marks | `ERROR 1644 … cannot be negative` |
+| Intervention citing another enrolment's alert | `ERROR 1644 … belongs to a different enrollment` |
+| Duplicate enrolment via `sp_enroll_student` | `ERROR 1644 … already enrolled in this course` |
+| Illegal alert transition via `sp_update_alert_status` | `ERROR 1644 … illegal status transition` |
+| `sp_record_attendance` run twice for one session | 1 row, corrected — not duplicated |
+| Audit triggers on a student update | both old and new values recorded |
+| A no-op `UPDATE` | writes **no** audit row |
+| Any password or hash in `audit_logs` | **0 rows** |
+
+**The two risk implementations agree.** The stored procedure scored all
+80 enrolments, then the Python engine scored the same MySQL rows: **zero
+mismatches** on score, band and completeness flag. `fn_engagement_score(21,
+2, 12, 1, 2, 5)` returns `29.00` in SQL — the same value the Python test
+asserts. Both produce the identical distribution: **9 high, 26 medium, 41
+low, 4 unscored**.
+
+**The application on MySQL:**
+
+- The backend starts against MySQL and reports `{"dialect": "mysql"}`
+- Full end-to-end over HTTP: sign-in for all five roles, role-based
+  redirection, dashboard figures, risk table and detail, alert
+  transitions, duplicate prevention, marks validation, all seven reports,
+  CSV export, and RBAC returning 403 where it should
+- Every one of the 17 pages rendered in real Chrome against the
+  MySQL-backed API with **no console errors, page errors or failed
+  requests**, and no horizontal overflow at 390px
+
+**Independently of the database:**
+
+- 406 backend tests pass (83% coverage); 83 frontend tests pass
+- The production build succeeds
+
+### Not verified
+
+- **Concurrency.** The duplicate-alert guard is enforced by a unique key,
+  so it holds under a race by construction, but no concurrent load test
+  was run.
+- **Scale.** The demo is 36 students and ~7,500 fact rows. Index choices
+  are sound for that size and `EXPLAIN` looks right, but behaviour at
+  tens of thousands of students is untested.
+- **`setup.sh --db`** runs the same five `mysql` commands documented in
+  §12, which were verified individually; the wrapper script itself was
+  not run end to end.
+- MySQL was verified on **8.0.46 on Linux**. Other 8.0.x patch releases
+  and other platforms should behave identically but were not tried.
 
 ## Licence
 

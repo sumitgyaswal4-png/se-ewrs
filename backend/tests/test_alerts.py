@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from app.models import AlertStatusHistory, AttendanceRecord, LmsActivityLog, RiskAlert
+from app.models import AttendanceRecord, LmsActivityLog, RiskAlert
 
 
 def make_at_risk(db, enrollment_id=1, attendance_ratio=0.3):

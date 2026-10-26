@@ -19,7 +19,7 @@ import SubmissionChart from '../components/charts/SubmissionChart.jsx'
 import { useMutation, useQuery } from '../hooks/useApi.js'
 import { useToast } from '../hooks/useToast.jsx'
 import { lookupApi, reportApi } from '../services/endpoints.js'
-import { RISK_LABELS, SEMESTERS } from '../utils/constants.js'
+import { SEMESTERS } from '../utils/constants.js'
 import { dateTime, humanise, percent, score } from '../utils/format.js'
 
 const REPORTS = [

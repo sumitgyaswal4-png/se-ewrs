@@ -1,11 +1,7 @@
 """Authentication: sign-in, token handling and password hygiene."""
 
-from datetime import timedelta
-
 import jwt
-import pytest
 
-from app.core.config import settings
 from app.core.security import (
     create_access_token,
     hash_password,

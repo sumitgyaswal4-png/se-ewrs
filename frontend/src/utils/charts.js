@@ -52,12 +52,12 @@ export const gridProps = {
 
 /** Chart marks are drawn without an entry animation.
  *
- * These charts redraw whenever a filter changes or the data reloads, so
- * an entry animation on every pass is noise rather than information. It
- * also means the marks are present as soon as the component renders,
- * which is what makes the chart tests able to assert on them.
+ * Each chart passes `isAnimationActive={false}` on its Bar/Line. These
+ * charts redraw whenever a filter changes or the data reloads, so an
+ * entry animation on every pass is noise rather than information -- and
+ * it means the marks are present as soon as the component renders, which
+ * is what lets the chart tests assert on them.
  */
-export const ANIMATION = false
 
 /** 4px rounded data-end, anchored to the baseline. */
 export const BAR_RADIUS = [4, 4, 0, 0]

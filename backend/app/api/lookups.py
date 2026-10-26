@@ -3,10 +3,10 @@
 from typing import Annotated, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession, require_permissions
-from app.core.exceptions import ConflictError, NotFoundError
+from app.core.exceptions import ConflictError
 from app.core.permissions import P_COURSES_READ, P_SETTINGS_WRITE
 from app.models import (
     ACTIVITY_TYPES,
