@@ -788,6 +788,48 @@ The hash should start with `$argon2id`. If the table is empty, re-run
 `seed.sql`.
 </details>
 
+<details><summary><b>You cannot get MySQL credentials on your machine</b></summary>
+
+If `mysql -u root` is denied and you cannot get the password or sudo
+rights, you do not need them: `mysqld` runs as an ordinary user against
+its own data directory, so you can start a completely private MySQL that
+does not touch the system one.
+
+```bash
+DIR=~/se-ewrs-mysql
+mkdir -p "$DIR/data" "$DIR/tmp"
+
+# One-off: create the data directory with a passwordless root
+mysqld --initialize-insecure --datadir="$DIR/data" \
+       --tmpdir="$DIR/tmp" --log-error="$DIR/init.log"
+
+# Start it on a spare port, in the background
+mysqld --datadir="$DIR/data" --tmpdir="$DIR/tmp" \
+       --port=3307 --socket=/tmp/sewrs.sock --mysqlx=0 \
+       --log-error="$DIR/server.log" &
+
+# Load the project
+mysql --socket=/tmp/sewrs.sock -u root < database/schema.sql
+mysql --socket=/tmp/sewrs.sock -u root se_ewrs < database/views.sql
+mysql --socket=/tmp/sewrs.sock -u root se_ewrs < database/procedures.sql
+mysql --socket=/tmp/sewrs.sock -u root se_ewrs < database/triggers.sql
+mysql --socket=/tmp/sewrs.sock -u root se_ewrs < database/seed.sql
+```
+
+Point the backend at it in `backend/.env`:
+
+```
+DATABASE_URL=mysql+pymysql://root@localhost/se_ewrs?unix_socket=/tmp/sewrs.sock&charset=utf8mb4
+```
+
+Stop it with `mysqladmin --socket=/tmp/sewrs.sock -u root shutdown`.
+
+Two things to watch: the Unix socket path has a hard **107-character
+limit**, so keep it short — a long path fails with *"The socket file path
+is too long"*. And this instance has a passwordless root, so it is for
+local development only.
+</details>
+
 <details><summary><b>Tests fail with an import error</b></summary>
 
 Run them from the `backend/` directory using the virtual environment's
