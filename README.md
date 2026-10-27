@@ -903,17 +903,50 @@ low, 4 unscored**.
 - 406 backend tests pass (83% coverage); 83 frontend tests pass
 - The production build succeeds
 
-### Not verified
+**Under concurrency** (real threads against real MySQL, released from a
+barrier so they fire at the same instant):
 
-- **Concurrency.** The duplicate-alert guard is enforced by a unique key,
-  so it holds under a race by construction, but no concurrent load test
-  was run.
-- **Scale.** The demo is 36 students and ~7,500 fact rows. Index choices
-  are sound for that size and `EXPLAIN` looks right, but behaviour at
-  tens of thousands of students is untested.
+| Race | Result |
+|---|---|
+| 20 threads insert an open alert for one enrolment | **1 succeeded, 19 refused** by the unique key; exactly 1 open alert |
+| 16 threads `CALL sp_recalculate_risk_for_enrollment` on a HIGH-risk student | all 16 completed, **exactly 1 alert**, no deadlocks |
+| 12 threads enrol the same student in the same course | **1 enrolled, 11 refused** |
+
+The second is the realistic one: two staff pressing **Recalculate** at
+the same moment. The constraint holds, and at 6,000 enrolments the full
+run produced 4,050 alerts with **zero** enrolments holding two.
+
+**At scale** — a synthetic dataset 170× the demo (2,000 students, 6,000
+enrolments, ~450,000 fact rows). This is where stress-testing earned its
+keep: it exposed a **132× performance bug** in the recalculation
+procedure, which read its inputs from a view and so aggregated the whole
+dataset on every call.
+
+| | before | after |
+|---|---|---|
+| one enrolment | 4,406 ms | **33.5 ms** |
+| all 6,000 | ~7 hours (projected) | **82 seconds** |
+
+The fix reads the base tables with an `enrollment_id` predicate instead.
+Output is **byte-identical** — both versions scored the same 80 demo
+enrolments and every field matched, including the generated
+contributing-factors text. Details in
+[`docs/database_design.md` §9](docs/database_design.md).
+
+### Not verified, and one measured limitation
+
+- **Composite reads above a few thousand enrolments.** At 6,000
+  enrolments the student, risk and dashboard endpoints take 5–9 s. The
+  cause is measured and understood (MySQL materialises five derived
+  aggregate tables and the join dominates: the parts cost 1.3 s, composed
+  5.7 s), and the remedy is known — paginate the enrolments before
+  aggregating. It was **not** fixed, because the project does not need it
+  and an unverified optimisation is worse than a documented limitation.
+  At the demo's scale, and at a realistic department scale, these are
+  instant. See [`docs/database_design.md` §9.3](docs/database_design.md).
 - **`setup.sh --db`** runs the same five `mysql` commands documented in
-  §12, which were verified individually; the wrapper script itself was
-  not run end to end.
+  §12, which were verified individually; the wrapper itself was not run
+  end to end.
 - MySQL was verified on **8.0.46 on Linux**. Other 8.0.x patch releases
   and other platforms should behave identically but were not tried.
 

@@ -134,7 +134,8 @@ END$$
 -- ---------------------------------------------------------------------
 -- sp_recalculate_risk_for_enrollment(enrollment_id, actor_user_id)
 --
---   1. Pulls the observed inputs from student_performance_view.
+--   1. Pulls the observed inputs straight from the base tables, using
+--      the per-enrolment indexes (see the note on the SELECTs below).
 --   2. Derives the three 0-100 risk components, skipping any component
 --      with no supporting data.
 --   3. Re-normalises the weights across the available components so a
@@ -178,6 +179,7 @@ BEGIN
     DECLARE v_min_sessions INT;
     DECLARE v_min_graded   INT;
     DECLARE v_target_logins INT;
+    DECLARE v_window_days   INT;
     DECLARE v_alert_min     INT;
     DECLARE v_model  VARCHAR(20);
 
@@ -209,33 +211,59 @@ BEGIN
     SET v_min_sessions   = CAST(fn_setting_num('risk.min_sessions', 3) AS SIGNED);
     SET v_min_graded     = CAST(fn_setting_num('risk.min_graded',   1) AS SIGNED);
     SET v_target_logins  = CAST(fn_setting_num('engagement.target_logins_30d', 12) AS SIGNED);
+    SET v_window_days    = CAST(fn_setting_num('risk.activity_window_days', 30) AS SIGNED);
     SET v_alert_min      = CAST(fn_setting_num('alert.min_score',  30) AS SIGNED);
     SET v_model = COALESCE((SELECT setting_value FROM system_settings
                             WHERE setting_key = 'risk.model_version'), 'rule-v1');
 
     -- observed inputs ------------------------------------------------
-    SELECT
-        COALESCE(spv.sessions_held, 0),
-        COALESCE(spv.sessions_attended, 0),
-        spv.attendance_percentage,
-        COALESCE(spv.graded_assessments, 0),
-        spv.avg_assessment_percentage,
-        COALESCE(spv.late_submissions, 0),
-        COALESCE(spv.missing_submissions, 0),
-        COALESCE(spv.login_count_30d, 0),
-        spv.days_since_last_activity,
-        spv.last_assessment_date
-      INTO
-        v_sessions_held, v_sessions_attended, v_att_pct,
-        v_graded, v_aca_pct, v_late, v_missing,
-        v_logins30, v_days_since, v_last_assess
-      FROM student_performance_view spv
-     WHERE spv.enrollment_id = p_enrollment_id;
+    -- These read the BASE TABLES with an enrollment_id predicate rather
+    -- than selecting a single row out of student_performance_view.
+    --
+    -- The view is the right thing for reporting, but it is the wrong
+    -- thing here: MySQL materialises each of its three aggregate
+    -- sub-views in full before filtering, so a per-enrolment lookup
+    -- aggregates the entire dataset every time. Measured on 6,000
+    -- enrolments over ~450,000 fact rows that cost 4.4 seconds PER CALL
+    -- (about 7 hours for a full run). Reading the base tables directly
+    -- uses ix_attendance_enrollment, ix_results_enrollment and
+    -- ix_lms_enrollment_time, and the same run takes seconds.
+    --
+    -- The arithmetic is deliberately identical to v_enrollment_attendance,
+    -- v_enrollment_academics and v_enrollment_activity; only the access
+    -- path differs.
 
-    SELECT COUNT(*) INTO v_results
-      FROM assessment_results WHERE enrollment_id = p_enrollment_id;
-    SELECT COUNT(*) INTO v_activities
-      FROM lms_activity_logs WHERE enrollment_id = p_enrollment_id;
+    -- attendance: LATE counts as attended, EXCUSED leaves the denominator
+    SELECT COALESCE(SUM(status <> 'EXCUSED'), 0),
+           COALESCE(SUM(status IN ('PRESENT','LATE')), 0)
+      INTO v_sessions_held, v_sessions_attended
+      FROM attendance_records
+     WHERE enrollment_id = p_enrollment_id;
+
+    SET v_att_pct = CASE WHEN v_sessions_held = 0 THEN NULL
+                         ELSE ROUND(100.0 * v_sessions_attended / v_sessions_held, 2) END;
+
+    -- academics: only graded rows feed the average
+    SELECT COUNT(*),
+           COALESCE(SUM(marks_obtained IS NOT NULL), 0),
+           ROUND(AVG(CASE WHEN marks_obtained IS NOT NULL THEN percentage END), 2),
+           COALESCE(SUM(submission_status = 'LATE'), 0),
+           COALESCE(SUM(submission_status = 'MISSING'), 0),
+           MAX(CASE WHEN marks_obtained IS NOT NULL
+                    THEN DATE(COALESCE(graded_at, submitted_at, created_at)) END)
+      INTO v_results, v_graded, v_aca_pct, v_late, v_missing, v_last_assess
+      FROM assessment_results
+     WHERE enrollment_id = p_enrollment_id;
+
+    -- LMS activity: logins inside the configured window, plus last-seen
+    SELECT COUNT(*),
+           COALESCE(SUM(activity_type = 'LOGIN'
+                        AND activity_at >= (CURRENT_DATE - INTERVAL v_window_days DAY)), 0),
+           CASE WHEN MAX(activity_at) IS NULL THEN NULL
+                ELSE DATEDIFF(CURRENT_DATE, DATE(MAX(activity_at))) END
+      INTO v_activities, v_logins30, v_days_since
+      FROM lms_activity_logs
+     WHERE enrollment_id = p_enrollment_id;
 
     -- component 1: attendance ---------------------------------------
     IF v_sessions_held >= v_min_sessions AND v_att_pct IS NOT NULL THEN

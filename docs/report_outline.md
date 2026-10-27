@@ -210,7 +210,27 @@ department's template.
 8.3 Observed risk distribution across the demo cohort, with a comment on
   whether it looks plausible
 
-8.4 Performance — query timings, index usage
+8.4 **Performance** — this section now has real material, which most
+  student reports lack. Use `docs/database_design.md` §9:
+  - The access-path bug found by stress-testing: reading one row from an
+    aggregate view made MySQL materialise the whole view, costing 4,406 ms
+    per call; reading the base tables with a predicate costs 33.5 ms. A
+    full 6,000-enrolment recalculation went from a projected ~7 hours to
+    82 seconds. **Show the `EXPLAIN` with `<derived3>` in it** — that is
+    the evidence, and it is a genuinely instructive screenshot.
+  - State that the output was proven byte-identical before and after, so
+    it was an optimisation and not a behaviour change.
+  - Index usage: the `EXPLAIN` showing `ix_lms_enrollment_time` as a
+    covering range scan reading 26 rows of 270,000.
+  - The measured composite-read limitation (§9.3) and why it was left
+    documented rather than speculatively "fixed".
+
+8.5 **Concurrency** — the duplicate-alert guard under real contention:
+  20 threads racing to open one alert (1 succeeded, 19 refused by the
+  unique key), and 16 threads calling the recalculation procedure
+  simultaneously on a high-risk student (all completed, exactly one
+  alert). This is the evidence that the constraint, not the application
+  code, is what makes duplicates impossible.
 
 ---
 
@@ -218,10 +238,14 @@ department's template.
 
 9.1 What was achieved, against the objectives in §1.3
 9.2 What was learned
-9.3 Limitations — rule-based model, no live LMS integration, single institution
-9.4 Future work — statistical/ML scoring validated against outcomes,
-  live LMS integration, notifications, a student-facing view, model
-  fairness auditing across demographic groups
+9.3 Limitations — rule-based model, no live LMS integration, single
+  institution, and the measured composite-read cost above a few thousand
+  enrolments (`docs/database_design.md` §9.3)
+
+9.4 Future work — paginate-then-aggregate for the list endpoints (the
+  known remedy for §9.3), statistical/ML scoring validated against real
+  outcomes, live LMS integration, notifications, a student-facing view,
+  and fairness auditing of the model across demographic groups
 
 ---
 
@@ -278,6 +302,16 @@ Testing (Ch. 7) and documentation are shared.
   disagreeing? *(One specification, half-up rounding on both sides, and
   integer cross-multiplication at the band boundaries instead of a float
   ratio.)*
+
+**On performance**
+- Your recalculation reads the base tables rather than the view you wrote
+  for reporting. Why? *(Selecting one row from an aggregate view makes
+  MySQL materialise the whole view first — `EXPLAIN` shows `<derived>`
+  tables. It measured 4,406 ms per call at scale versus 33.5 ms against
+  the base tables. A view is an abstraction, not an index.)*
+- How do you know the optimisation did not change the results? *(Both
+  versions were run against identical data and every field of all 80 rows
+  matched, including the generated factor text.)*
 
 **On triggers and procedures**
 - Why is alert generation in a procedure rather than a trigger? *(A

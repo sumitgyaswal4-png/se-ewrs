@@ -442,7 +442,112 @@ SELECT action, entity_type, entity_id, old_values, new_values
 
 ---
 
-## 9. Keeping SQL and Python in step
+## 9. Performance
+
+Measured on MySQL 8.0.46 against a synthetic dataset **170x the demo**:
+2,000 students, 40 courses, 6,000 enrolments, 144,000 attendance records,
+270,000 LMS events and 30,000 assessment results (~450,000 fact rows).
+
+### 9.1 The access-path bug this testing found
+
+`sp_recalculate_risk_for_enrollment` originally read its inputs from
+`student_performance_view`:
+
+```sql
+SELECT ... INTO ... FROM student_performance_view spv
+ WHERE spv.enrollment_id = p_enrollment_id;
+```
+
+That looks efficient -- one row, filtered by primary key. It is not.
+`EXPLAIN` shows `<derived3>`, `<derived4>`, `<derived5>`: MySQL
+**materialises each of the three aggregate sub-views in full** and only
+then applies the predicate. Every call therefore aggregated all 450,000
+fact rows to retrieve one row.
+
+| | per call | 6,000 enrolments |
+|---|---|---|
+| reading `student_performance_view` | 4,406 ms | ~7 hours (projected) |
+| reading the base tables with a predicate | **33.5 ms** | **82 seconds** |
+
+A **132x** improvement, and the output is byte-identical: both versions
+were run against the same data and every field of all 80 demo rows
+matched, including the generated `contributing_factors` text.
+
+The fix is the three targeted `SELECT`s now in the procedure. They use
+`ix_attendance_enrollment`, `ix_results_enrollment` and
+`ix_lms_enrollment_time`, and they reproduce the view's arithmetic
+exactly -- only the access path differs.
+
+**The general lesson**, and the reason this is worth a paragraph in the
+report: *a view is an abstraction, not an index.* Selecting one row from
+an aggregate view is not the same as aggregating one row. The Python
+engine never had this problem because `collect_metrics()` always queried
+base tables with a predicate; only the SQL side went through the view.
+
+### 9.2 Measured timings after the fix
+
+| Operation | Demo (80 enrolments) | Scale (6,000 enrolments) |
+|---|---|---|
+| Load `seed.sql` | 9 s | -- |
+| `sp_recalculate_all_risk` (whole cohort) | 1.1 s | 82 s |
+| `sp_recalculate_risk_for_enrollment` (one) | <5 ms | 33 ms |
+| Alert queue (`v_active_alerts`) | instant | 158 ms |
+| Submission patterns report | instant | 746 ms |
+| Course performance report | instant | 1,115 ms |
+
+Index usage is as designed. The risk engine's hottest predicate uses the
+composite index as a covering range scan:
+
+```
+EXPLAIN SELECT COUNT(*) FROM lms_activity_logs
+ WHERE enrollment_id = 1 AND activity_at >= (CURRENT_DATE - INTERVAL 30 DAY);
+
+type: range   key: ix_lms_enrollment_time   rows: 26   Extra: Using index
+```
+
+26 rows examined out of 270,000.
+
+### 9.3 A known limitation: composite reads at scale
+
+The composite reads -- `student_risk_summary` and the equivalent
+SQLAlchemy statements behind the student, course and risk list endpoints
+-- do **not** scale linearly, and this is a real limitation rather than a
+tuning detail.
+
+Measured on the 6,000-enrolment dataset:
+
+| Component | Time |
+|---|---|
+| group enrolments by student | 44 ms |
+| aggregate attendance (144k rows) | 792 ms |
+| aggregate LMS activity (270k rows) | 229 ms |
+| latest-risk window function | 227 ms |
+| **the five joined together** | **5,711 ms** |
+
+The parts cost ~1.3 s; composed they cost 5.7 s. MySQL materialises each
+derived table and then joins them with auto-generated keys, and that join
+dominates. End to end this shows as 5-9 s for `GET /api/students`,
+`GET /api/risk-assessments` and `GET /api/dashboard/summary`.
+
+**Why it is not a problem for this project:** at the demo's scale -- and
+at a realistic single-department scale of a few hundred enrolments --
+every one of these is effectively instant. The limitation only appears
+above a few thousand enrolments.
+
+**The remedy, if it ever mattered:** the aggregates are computed for the
+whole dataset in order to return one page of 20 rows. Paginating the
+enrolments *first* and aggregating only that page's `enrollment_id`s
+turns the cost from O(all rows) into O(page). Alternatives are a
+materialised summary table refreshed on recalculation, or simply reading
+the snapshot columns already stored on `risk_assessments` instead of
+recomputing the live figures. Each is a contained change to
+`services/queries.py`; none was made here because it is outside what the
+project needs, and an unverified optimisation is worse than a documented
+limitation.
+
+---
+
+## 10. Keeping SQL and Python in step
 
 Two implementations of §3 exist, by design:
 
