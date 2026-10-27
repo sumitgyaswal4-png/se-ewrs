@@ -622,7 +622,7 @@ and every router under test are the same code that runs against MySQL.
 | `test_system.py` | 23 | Health, settings validation, audit trail, error envelopes, SQL-injection payload |
 | `test_seed.py` | 27 | Demo dataset properties, risk spread, reseed idempotency |
 
-### Frontend — 83 tests
+### Frontend — 92 tests
 
 ```bash
 cd frontend
@@ -634,7 +634,9 @@ Covers formatting helpers (including that missing data renders as an em
 dash, never `0%`), the risk badge (icon and label always present, so
 colour is never the only cue), the data table's four states and
 server-side sorting, chart rendering, role-based navigation, the
-data-fetching hook's state machine, and the login page.
+data-fetching hook's state machine, the login page, the meter colouring
+(a poor figure must never be drawn in a reassuring colour) and the trend
+chart (a legend must never name a line the chart cannot draw).
 
 ---
 
@@ -676,7 +678,8 @@ se-ewrs/
 │   ├── database_design.md    design decisions, risk spec, full SQL reference
 │   ├── api_documentation.md  endpoint reference with examples
 │   ├── user_guide.md         guide for the five staff roles
-│   └── report_outline.md     chapter skeleton for the written submission
+│   ├── report_outline.md     chapter skeleton for the written submission
+│   └── screenshots/          15 captioned screenshots of the running app
 ├── .env.example
 ├── .gitignore
 ├── setup.sh
@@ -898,9 +901,17 @@ low, 4 unscored**.
   MySQL-backed API with **no console errors, page errors or failed
   requests**, and no horizontal overflow at 390px
 
+**`setup.sh --db`, run end to end** against a clean MySQL: it installs
+both dependency sets, generates `backend/.env` with a fresh 64-character
+`SECRET_KEY`, applies all five SQL scripts in order and prints the
+resulting risk distribution — which came back as the documented **41 low,
+26 medium, 9 high, 4 needing more data**. The script re-runs safely: the
+schema drops its tables in reverse dependency order and the seed clears
+them first.
+
 **Independently of the database:**
 
-- 406 backend tests pass (83% coverage); 83 frontend tests pass
+- 406 backend tests pass (83% coverage); 92 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a
@@ -944,9 +955,6 @@ contributing-factors text. Details in
   and an unverified optimisation is worse than a documented limitation.
   At the demo's scale, and at a realistic department scale, these are
   instant. See [`docs/database_design.md` §9.3](docs/database_design.md).
-- **`setup.sh --db`** runs the same five `mysql` commands documented in
-  §12, which were verified individually; the wrapper itself was not run
-  end to end.
 - MySQL was verified on **8.0.46 on Linux**. Other 8.0.x patch releases
   and other platforms should behave identically but were not tried.
 

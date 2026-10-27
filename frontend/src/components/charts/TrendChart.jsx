@@ -1,8 +1,14 @@
 /** Academic performance and attendance over time.
  *
- * Two series, both percentages, so they share one y-axis - never a
- * second scale on the right. Both are drawn from the fixed categorical
- * slots in order (blue, orange) and are direct-labelled by the legend.
+ * Up to two series, both percentages, so they share one y-axis - never a
+ * second scale on the right. They are drawn from the fixed categorical
+ * slots in order (blue, orange).
+ *
+ * Only the series the data actually carries are drawn. The dashboard's
+ * trend endpoint returns assessment and attendance; the per-student one
+ * returns assessment alone, and a legend naming a line that the chart
+ * cannot draw is worse than no legend. With a single series the card
+ * title names it, so the legend box is dropped entirely.
  */
 
 import {
@@ -42,6 +48,10 @@ export default function TrendChart({ points, height = 280 }) {
     )
   }
 
+  const series = SERIES.filter((item) =>
+    points.some((point) => point[item.key] !== null && point[item.key] !== undefined),
+  )
+
   return (
     <div className="p-5">
       <div style={{ height }}>
@@ -58,20 +68,22 @@ export default function TrendChart({ points, height = 280 }) {
                 name,
               ]}
             />
-            <Legend
-              verticalAlign="top"
-              align="right"
-              height={28}
-              iconType="plainline"
-              wrapperStyle={{ fontSize: '0.75rem', color: '#475569' }}
-            />
-            {SERIES.map((series) => (
+            {series.length > 1 && (
+              <Legend
+                verticalAlign="top"
+                align="right"
+                height={28}
+                iconType="plainline"
+                wrapperStyle={{ fontSize: '0.75rem', color: '#475569' }}
+              />
+            )}
+            {series.map((item) => (
               <Line
-                key={series.key}
+                key={item.key}
                 type="monotone"
-                dataKey={series.key}
-                name={series.name}
-                stroke={series.color}
+                dataKey={item.key}
+                name={item.name}
+                stroke={item.color}
                 strokeWidth={2}
                 dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff' }}
                 activeDot={{ r: 6, strokeWidth: 2, stroke: '#ffffff' }}

@@ -15,7 +15,7 @@ import { useMutation, useQuery } from '../hooks/useApi.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { useToast } from '../hooks/useToast.jsx'
 import { riskApi } from '../services/endpoints.js'
-import { RISK_COLORS } from '../utils/charts.js'
+import { meterColor } from '../utils/charts.js'
 import { dateOnly, relativeDays, score, splitFactors } from '../utils/format.js'
 
 export default function RiskDetailPage() {
@@ -177,19 +177,20 @@ export default function RiskDetailPage() {
               label="Attendance"
               value={row.attendance_percentage}
               hint={`${row.sessions_attended} of ${row.sessions_held} sessions attended`}
-              color={RISK_COLORS.LOW}
+              color={meterColor(row.attendance_percentage, thresholds)}
             />
             <Meter
               label="Assessment average"
               value={row.avg_assessment_percentage}
               hint={`${row.graded_assessments} graded assessment(s)`}
+              color={meterColor(row.avg_assessment_percentage, thresholds)}
             />
             <Meter
               label="Engagement score"
               value={row.engagement_score}
               suffix="/100"
               hint="Higher is better"
-              color={RISK_COLORS.MEDIUM}
+              color={meterColor(row.engagement_score, thresholds)}
             />
             <dl className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">
               <div>

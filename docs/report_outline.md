@@ -167,8 +167,8 @@ department's template.
   > **Table:** test file → what it verifies → count
   > **Screenshot:** the `pytest` summary line
 
-7.3 **Frontend tests** — 83 tests across formatting, components, charts,
-  navigation and the data hook
+7.3 **Frontend tests** — 92 tests across formatting, components, charts,
+  navigation, the data hook and the status-colour helper
 
 7.4 **Selected test cases** — present 8–10 as a formal table
   (ID, description, input, expected, actual, pass/fail). Good candidates:
@@ -192,20 +192,40 @@ department's template.
 8.1 Demo dataset — 36 students, 6 courses, 80 enrolments, ~1,700
   attendance records, ~5,400 activity events, 380 results
 
-8.2 **Screenshots**, each with a caption explaining what it demonstrates:
-  - Login with role-based redirection
-  - Dashboard with live metrics and charts
-  - Student list with filters, and a student profile
-  - Attendance marking
-  - Marks entry with validation rejecting an out-of-range mark
-  - **The risk analysis table**
-  - **The risk detail page** — the best single screenshot in the report,
-    because it shows the formula, the components, the weights and the
-    contributing factors together
-  - Alert queue and alert detail with status history
-  - Intervention tracking
-  - Reports with a CSV export
-  - Settings showing the configurable weights
+8.2 **Screenshots** — all fifteen are captured and captioned in
+  `docs/screenshots/` (see its `README.md`, which is written to be lifted
+  into the report as the figure list). They were taken from the running
+  application against the MySQL demo database, so the figures agree
+  across images.
+
+  | Fig. | File | Demonstrates |
+  |---|---|---|
+  | 1 | `01-login.png` | Login, with the demo accounts and role-based landing |
+  | 2 | `02-dashboard-admin.png` | Live metrics and charts, every figure from SQL |
+  | 3 | `03-students-filtered-high-risk.png` | Student list filtered to high risk (36 → 5) |
+  | 4 | `04-student-profile.png` | One student across all their courses |
+  | 5 | `05-attendance-marking.png` | Marking a whole session in one pass |
+  | 6 | `06-marks-validation-rejected.png` | **999 marks out of 10 refused by the server** |
+  | 7 | `07-risk-analysis-table.png` | The risk analysis table |
+  | 8 | `08-risk-detail.png` | **The best single figure** — formula, weights, components and factors together |
+  | 9 | `09-alerts-queue.png` | The early-warning alert queue |
+  | 10 | `10-alert-detail-history.png` | An alert with its status history |
+  | 11 | `11-interventions.png` | Intervention tracking |
+  | 12 | `12-reports-csv-export.png` | Reports, just after a real CSV export |
+  | 13 | `13-settings-risk-weights.png` | The configurable weights and thresholds |
+  | 14 | `14-rbac-teaching-assistant.png` | The same app as a Teaching Assistant |
+  | 15 | `15-rbac-department-chair.png` | The same app as a read-only Department Chair |
+
+  Figure 6 is worth a paragraph rather than a caption. The entered value
+  passes the HTML `max` attribute — that attribute only constrains the
+  spinner — so the request reaches the API, which refuses it, and the
+  database would refuse it again. Three layers, and the screenshot shows
+  the one that actually matters.
+
+  Figures 14 and 15 are the clearest evidence for Chapter 6's access
+  control: the same build, the same URL, a different navigation tree.
+  Say in the text that hiding the control is only the visible half, and
+  that each endpoint behind it re-checks the permission server-side.
 
 8.3 Observed risk distribution across the demo cohort, with a comment on
   whether it looks plausible

@@ -14,7 +14,7 @@ import { ChartSkeleton, ErrorState, LoadingState } from '../components/States.js
 import TrendChart from '../components/charts/TrendChart.jsx'
 import { useQuery } from '../hooks/useApi.js'
 import { assessmentApi, studentApi } from '../services/endpoints.js'
-import { RISK_COLORS } from '../utils/charts.js'
+import { meterColor } from '../utils/charts.js'
 import { count, dateTime, percent, relativeDays } from '../utils/format.js'
 
 export default function StudentProfilePage() {
@@ -37,7 +37,7 @@ export default function StudentProfilePage() {
     )
   }
 
-  const { student, summary, courses } = profile.data
+  const { student, summary, courses, thresholds } = profile.data
 
   const columns = [
     {
@@ -197,12 +197,13 @@ export default function StudentProfilePage() {
             <Meter
               label="Attendance"
               value={summary.attendance_percentage}
-              color={RISK_COLORS.LOW}
+              color={meterColor(summary.attendance_percentage, thresholds)}
               hint="Mean across all enrolled courses"
             />
             <Meter
               label="Assessment average"
               value={summary.avg_assessment_percentage}
+              color={meterColor(summary.avg_assessment_percentage, thresholds)}
               hint="Graded work only; ungraded items are excluded"
             />
             <dl className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-sm">

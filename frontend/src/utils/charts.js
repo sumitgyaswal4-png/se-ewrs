@@ -77,3 +77,24 @@ export const tooltipStyle = {
 export function riskColor(category) {
   return RISK_COLORS[category] ?? RISK_COLORS.INSUFFICIENT_DATA
 }
+
+/** The band a "higher is better" figure falls in, as a status colour.
+ *
+ * Attendance, assessment average and engagement score are all scored the
+ * same way by the risk model: the component's risk is `100 - value`, and
+ * that risk is banded with the configured thresholds. Colouring the
+ * meters this way keeps them honest - a status colour then means what it
+ * says instead of decorating the row it happens to sit on. The figure
+ * itself is always printed beside the bar, so colour never carries the
+ * meaning alone.
+ */
+export function meterColor(value, thresholds = {}) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return RISK_COLORS.INSUFFICIENT_DATA
+  }
+  const { medium = 30, high = 60 } = thresholds
+  const risk = 100 - Number(value)
+  if (risk >= high) return RISK_COLORS.HIGH
+  if (risk >= medium) return RISK_COLORS.MEDIUM
+  return RISK_COLORS.LOW
+}

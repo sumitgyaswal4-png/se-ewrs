@@ -19,7 +19,7 @@ from app.schemas.academics import (
     StudentWithSummary,
 )
 from app.schemas.common import Message, Page
-from app.services import audit
+from app.services import audit, risk_engine
 from app.services.queries import risk_summary_select, student_stats_sq
 
 router = APIRouter(dependencies=[Depends(require_permissions(P_STUDENTS_READ))])
@@ -277,7 +277,13 @@ def student_profile(student_pk: int, db: DbSession) -> StudentProfile:
         missing_submissions=missing,
         last_activity_at=last_activity,
     )
-    return StudentProfile(student=_student_out(db, student), summary=summary, courses=courses)
+    cfg = risk_engine.RiskConfig.from_db(db)
+    return StudentProfile(
+        student=_student_out(db, student),
+        summary=summary,
+        courses=courses,
+        thresholds={"medium": cfg.threshold_medium, "high": cfg.threshold_high},
+    )
 
 
 @router.put(

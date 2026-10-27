@@ -184,7 +184,7 @@ return `0` and the averages return `null` — never a hardcoded value.
 | GET | `` | `students:read` | List with search, filters, sorting, pagination and a per-student summary |
 | POST | `` | `students:write` | Add a student |
 | GET | `/{student_pk}` | `students:read` | One student |
-| GET | `/{student_pk}/profile` | `students:read` | Summary + a row per enrolled course |
+| GET | `/{student_pk}/profile` | `students:read` | Summary, a row per enrolled course, and the configured band thresholds |
 | PUT | `/{student_pk}` | `students:write` | Update |
 | PATCH | `/{student_pk}/deactivate` | `students:write` | Soft delete |
 | PATCH | `/{student_pk}/reactivate` | `students:write` | Restore |

@@ -1,7 +1,7 @@
 """Department, student, course and enrolment schemas."""
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
@@ -107,6 +107,10 @@ class StudentProfile(BaseModel):
     student: StudentOut
     summary: StudentSummary
     courses: List[StudentCourseRow]
+    #: The configured band edges, so the client colours the summary
+    #: meters with the same thresholds the risk model is using rather
+    #: than a hard-coded copy of them.
+    thresholds: Dict[str, int]
 
 
 # --- courses ---------------------------------------------------------------
