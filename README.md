@@ -909,6 +909,17 @@ resulting risk distribution — which came back as the documented **41 low,
 schema drops its tables in reverse dependency order and the seed clears
 them first.
 
+**Rebuilt from nothing**, to check that the repository is actually
+self-sufficient: a brand-new empty MySQL instance, then `setup.sh --db`
+and nothing else. It reproduced **all 80 risk scores to the last
+decimal** — enrolment 28 at 77.80, enrolment 34 at 2.72, enrolment 74 at
+68.10, and so on for every row — along with the same 35 alerts and the
+same 41/26/9/4 distribution. Two things follow: the seed is genuinely
+deterministic despite writing its dates as `CURDATE()` arithmetic, and
+the five SQL scripts need nothing that is not in this repository. The
+application was then driven through **every page as all five roles — 51
+page loads — with no console errors, page errors or failed requests**.
+
 **Independently of the database:**
 
 - 406 backend tests pass (83% coverage); 92 frontend tests pass
