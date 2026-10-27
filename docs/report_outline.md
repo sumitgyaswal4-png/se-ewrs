@@ -260,6 +260,10 @@ department's template.
     is the interesting part: the fix came from reading what each
     endpoint filters, sorts and counts on, not from tuning anything.
 
+  - Say that the whole of section 8.4 is reproducible: one command,
+    `./database/scale_test.sh`, rebuilds the benchmark database and
+    reprints the timings. An examiner who asks "show me" can be shown.
+
 8.5 **Concurrency** — the duplicate-alert guard under real contention:
   20 threads racing to open one alert (1 succeeded, 19 refused by the
   unique key), and 16 threads calling the recalculation procedure

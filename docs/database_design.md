@@ -587,6 +587,24 @@ With this, every composite read in the API is below a second on the
 6,000-enrolment dataset, and the limitation recorded in earlier versions
 of this section is gone rather than merely documented.
 
+### 9.5 Reproducing these numbers
+
+None of section 9 has to be taken on trust. `database/scale_test.sh`
+builds the benchmark database from this repository's own schema, views,
+procedures and triggers, generates the ~444,000 synthetic fact rows and
+recalculates every enrolment, printing the timings as it goes:
+
+```bash
+./database/scale_test.sh
+```
+
+It writes to `se_ewrs_scale` and refuses to run against `se_ewrs`, so
+the demo data is never at risk. A full build takes about two minutes:
+roughly 50 s to generate the rows and 70 s to score 6,000 enrolments --
+the latter being the measurement that was seven projected hours before
+the fix in section 9.1. Drop it afterwards with
+`DROP DATABASE se_ewrs_scale;`.
+
 ## 10. Keeping SQL and Python in step
 
 Two implementations of §3 exist, by design:
