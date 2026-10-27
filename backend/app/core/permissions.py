@@ -127,6 +127,3 @@ def permissions_for(role: str) -> FrozenSet[str]:
     """Permissions granted to ``role``; unknown roles get nothing."""
     return ROLE_PERMISSIONS.get(role, frozenset())
 
-
-def role_has(role: str, permission: str) -> bool:
-    return permission in permissions_for(role)

@@ -220,65 +220,6 @@ def open_alert_sq(limit_to=None) -> Subquery:
 # ---------------------------------------------------------------------------
 # Composite selects
 # ---------------------------------------------------------------------------
-def performance_select(window_days: int = 30, limit_to=None) -> Select:
-    """Mirrors ``student_performance_view``: one row per (student, course)."""
-    att = attendance_sq(limit_to)
-    aca = academics_sq(limit_to)
-    act = activity_sq(window_days, limit_to=limit_to)
-    return (
-        select(
-            Enrollment.enrollment_id,
-            Enrollment.status.label("enrollment_status"),
-            Enrollment.enrolled_on,
-            Student.student_pk,
-            Student.student_id,
-            Student.full_name.label("student_name"),
-            Student.email.label("student_email"),
-            Student.semester.label("student_semester"),
-            Student.enrollment_year,
-            Student.is_active.label("student_active"),
-            Department.dept_id,
-            Department.dept_code,
-            Department.dept_name,
-            Course.course_pk,
-            Course.course_code,
-            Course.course_name,
-            Course.semester.label("course_semester"),
-            Course.academic_term,
-            Course.credits,
-            func.coalesce(att.c.sessions_held, 0).label("sessions_held"),
-            func.coalesce(att.c.sessions_attended, 0).label("sessions_attended"),
-            func.coalesce(att.c.sessions_absent, 0).label("sessions_absent"),
-            func.coalesce(att.c.sessions_late, 0).label("sessions_late"),
-            func.coalesce(att.c.sessions_excused, 0).label("sessions_excused"),
-            att.c.attendance_percentage,
-            att.c.last_session_date,
-            func.coalesce(aca.c.results_recorded, 0).label("results_recorded"),
-            func.coalesce(aca.c.graded_assessments, 0).label("graded_assessments"),
-            aca.c.avg_assessment_percentage,
-            aca.c.min_assessment_percentage,
-            aca.c.max_assessment_percentage,
-            func.coalesce(aca.c.ontime_submissions, 0).label("ontime_submissions"),
-            func.coalesce(aca.c.late_submissions, 0).label("late_submissions"),
-            func.coalesce(aca.c.missing_submissions, 0).label("missing_submissions"),
-            aca.c.last_assessment_at,
-            func.coalesce(act.c.total_activities, 0).label("total_activities"),
-            func.coalesce(act.c.login_count_30d, 0).label("login_count_30d"),
-            func.coalesce(act.c.login_count_total, 0).label("login_count_total"),
-            func.coalesce(act.c.quiz_attempts, 0).label("quiz_attempts"),
-            func.coalesce(act.c.submission_events, 0).label("submission_events"),
-            func.coalesce(act.c.total_minutes, 0).label("total_minutes"),
-            act.c.last_activity_at,
-        )
-        .join(Student, Student.student_pk == Enrollment.student_pk)
-        .join(Department, Department.dept_id == Student.dept_id)
-        .join(Course, Course.course_pk == Enrollment.course_pk)
-        .outerjoin(att, att.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(aca, aca.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(act, act.c.enrollment_id == Enrollment.enrollment_id)
-    )
-
-
 def risk_summary_select(window_days: int = 30, limit_to=None, live: bool = True) -> Select:
     """Mirrors ``student_risk_summary``: performance + latest risk + alert.
 
