@@ -537,39 +537,55 @@ risk detail, every student profile, every course roster and every alert
 in the demo database -- **157 responses** -- were captured before and
 after and compared. They are identical byte for byte.
 
-### 9.4 What is still slow: the paginated lists
+### 9.4 The paginated lists: aggregate the page, not the database
 
-`GET /api/students` and `GET /api/risk-assessments` were **not** fixed
-and still take 8-9 s on the 6,000-enrolment dataset.
+The two list endpoints had the same shape of problem one step removed.
+A list computes its aggregates over the whole filtered set in order to
+return a page of twenty. At 6,000 enrolments that cost 7.7-7.9 s.
 
-They are a harder problem than the single-entity reads, and honestly so.
-A list computes aggregates for the whole filtered set in order to return
-one page of 20, but it cannot simply restrict them to the page: the page
-is not known until the query has run, and `student_stats_sq` genuinely
-aggregates the live figures rather than merely displaying them. The fix
-is to select the page's keys first and aggregate only those -- two round
-trips instead of one -- which is a different and larger change.
+It cannot be fixed the way section 9.3 fixes the single-entity reads,
+because the page is not known until the query has run. But it does not
+need to be: **the expensive aggregates are not what the page is chosen
+by.** Reading the two endpoints carefully:
 
-Measured on the 6,000-enrolment dataset:
+| | `GET /api/risk-assessments` | `GET /api/students` |
+|---|---|---|
+| filters on | enrolment, student, course, latest risk, open alert | student columns, risk counts |
+| sorts on | risk score, student, course, calculated-at | student columns only |
+| counts over | the same | the same |
+| attendance / academics / activity used for | three display columns | five display columns |
 
-| Component | Time |
-|---|---|
-| group enrolments by student | 44 ms |
-| aggregate attendance (144k rows) | 792 ms |
-| aggregate LMS activity (270k rows) | 229 ms |
-| latest-risk window function | 227 ms |
-| **the five joined together** | **5,711 ms** |
+Nothing selects the page by attendance, marks or activity. So each
+endpoint now runs two statements instead of one: the first chooses the
+page without those aggregates, and the second computes them for the
+twenty enrolments -- or students -- that came back.
 
-The parts cost ~1.3 s; composed they cost 5.7 s, because MySQL
-materialises each derived table and then joins them with auto-generated
-keys. At the demo's scale, and at a realistic single-department scale of
-a few hundred enrolments, both endpoints are effectively instant; the
-limitation appears only above a few thousand.
+| Endpoint | Before | After | |
+|---|---|---|---|
+| `GET /api/students` | 7,661 ms | **643 ms** | 12x |
+| `GET /api/risk-assessments` | 7,852 ms | **777 ms** | 10x |
 
-Leaving it is a deliberate choice, and the same one as before: the
-project does not need it, and an unverified optimisation is worse than a
-documented limitation. The difference from section 9.3 is that there the
-equivalence argument was provable and was proved.
+For the student list this meant splitting the per-student summary in
+two: `student_risk_counts_sq` (enrolment counts, worst band, open
+alerts -- from `enrollments` and the latest risk row alone) is what the
+list filters, sorts and counts on, and `student_live_stats_select`
+(averaged attendance and marks, submission counts, last-seen) is fetched
+for the page. The split is safe because every join involved is at most
+one row per enrolment, so dropping three of them cannot change the
+counts, and adding them back for twenty students cannot change what they
+average.
+
+Verified the same way as section 9.3, and more broadly, because a list
+has far more ways to be wrong than a single row: **77 responses** --
+five sort columns in both directions across multiple pages, every risk
+band, eight filter combinations, and two deliberately empty results --
+captured before and after. Identical byte for byte. The compiled SQL of
+the un-paginated callers is unchanged, so nothing that shares these
+builders moved.
+
+With this, every composite read in the API is below a second on the
+6,000-enrolment dataset, and the limitation recorded in earlier versions
+of this section is gone rather than merely documented.
 
 ## 10. Keeping SQL and Python in step
 

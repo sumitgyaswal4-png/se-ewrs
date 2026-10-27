@@ -20,7 +20,11 @@ from app.schemas.academics import (
 )
 from app.schemas.common import Message, Page
 from app.services import audit, risk_engine
-from app.services.queries import risk_summary_select, student_stats_sq
+from app.services.queries import (
+    risk_summary_select,
+    student_live_stats_select,
+    student_risk_counts_sq,
+)
 
 router = APIRouter(dependencies=[Depends(require_permissions(P_STUDENTS_READ))])
 
@@ -70,7 +74,10 @@ def list_students(
     if sort_by not in SORTABLE:
         raise ValidationError(f"sort_by must be one of {', '.join(SORTABLE)}")
 
-    stats = student_stats_sq()
+    # Filter, sort and count on the cheap half of the summary only: the
+    # averaged attendance and marks are displayed but never selected on,
+    # so they are fetched for the page once it is known.
+    stats = student_risk_counts_sq()
     stmt = (
         select(Student, Department.dept_code, Department.dept_name, stats)
         .join(Department, Department.dept_id == Student.dept_id)
@@ -109,9 +116,27 @@ def list_students(
     column = SORTABLE[sort_by]
     stmt = stmt.order_by(column.desc() if sort_dir == "desc" else column.asc())
 
+    rows = list(db.execute(stmt.offset(page.offset).limit(page.limit)).mappings())
+
+    # Now the display-only figures, for this page's students only.
+    pks = [row["Student"].student_pk for row in rows]
+    live = (
+        {r["student_pk"]: r for r in db.execute(student_live_stats_select(pks)).mappings()}
+        if pks
+        else {}
+    )
+    empty = {
+        "attendance_percentage": None,
+        "avg_assessment_percentage": None,
+        "late_submissions": 0,
+        "missing_submissions": 0,
+        "last_activity_at": None,
+    }
+
     items: List[StudentWithSummary] = []
-    for row in db.execute(stmt.offset(page.offset).limit(page.limit)).mappings():
+    for row in rows:
         student: Student = row["Student"]
+        figures = live.get(student.student_pk, empty)
         highest = _as_float(row["highest_risk_score"])
         items.append(
             StudentWithSummary(
@@ -122,14 +147,16 @@ def list_students(
                 dept_name=row["dept_name"],
                 summary=StudentSummary(
                     enrolled_courses=row["enrolled_courses"] or 0,
-                    attendance_percentage=_as_float(row["attendance_percentage"]),
-                    avg_assessment_percentage=_as_float(row["avg_assessment_percentage"]),
+                    attendance_percentage=_as_float(figures["attendance_percentage"]),
+                    avg_assessment_percentage=_as_float(
+                        figures["avg_assessment_percentage"]
+                    ),
                     highest_risk_score=highest,
                     highest_risk_category=_category_for(highest),
                     open_alerts=row["open_alerts"] or 0,
-                    late_submissions=row["late_submissions"] or 0,
-                    missing_submissions=row["missing_submissions"] or 0,
-                    last_activity_at=row["last_activity_at"],
+                    late_submissions=figures["late_submissions"] or 0,
+                    missing_submissions=figures["missing_submissions"] or 0,
+                    last_activity_at=figures["last_activity_at"],
                 ),
             )
         )

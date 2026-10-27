@@ -32,7 +32,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import Select, and_, case, func, literal, select
+from sqlalchemy import Select, and_, case, func, literal, null, select
 from sqlalchemy.sql import Subquery
 
 from app.models import (
@@ -279,7 +279,7 @@ def performance_select(window_days: int = 30, limit_to=None) -> Select:
     )
 
 
-def risk_summary_select(window_days: int = 30, limit_to=None) -> Select:
+def risk_summary_select(window_days: int = 30, limit_to=None, live: bool = True) -> Select:
     """Mirrors ``student_risk_summary``: performance + latest risk + alert.
 
     Pass ``limit_to`` when the caller already knows which enrolments it
@@ -287,12 +287,34 @@ def risk_summary_select(window_days: int = 30, limit_to=None) -> Select:
     five aggregates below are each computed over the whole database and
     then filtered, which is correct but costs the same whether you asked
     for one row or all of them.
+
+    ``live=False`` drops the three attendance/academics/activity joins
+    and leaves their columns NULL. They are display-only: nothing filters,
+    sorts or counts on them, and each is grouped by ``enrollment_id`` so
+    the joins cannot change how many rows come back. A paginated caller
+    can therefore select its page without them and fill those three
+    columns in afterwards with :func:`live_figures_select`, which is the
+    difference between aggregating the whole database and aggregating
+    twenty enrolments.
     """
-    att = attendance_sq(limit_to)
-    aca = academics_sq(limit_to)
-    act = activity_sq(window_days, limit_to=limit_to)
+    att = attendance_sq(limit_to) if live else None
+    aca = academics_sq(limit_to) if live else None
+    act = activity_sq(window_days, limit_to=limit_to) if live else None
     lr, oa = latest_risk_sq(limit_to), open_alert_sq(limit_to)
-    return (
+    live_columns = (
+        [
+            att.c.attendance_percentage.label("live_attendance_percentage"),
+            aca.c.avg_assessment_percentage.label("live_assessment_percentage"),
+            act.c.last_activity_at,
+        ]
+        if live
+        else [
+            null().label("live_attendance_percentage"),
+            null().label("live_assessment_percentage"),
+            null().label("last_activity_at"),
+        ]
+    )
+    stmt = (
         select(
             Enrollment.enrollment_id,
             Enrollment.status.label("enrollment_status"),
@@ -334,9 +356,7 @@ def risk_summary_select(window_days: int = 30, limit_to=None) -> Select:
             lr.c.calculated_at,
             lr.c.model_version,
             # live figures, used when no risk run has happened yet
-            att.c.attendance_percentage.label("live_attendance_percentage"),
-            aca.c.avg_assessment_percentage.label("live_assessment_percentage"),
-            act.c.last_activity_at,
+            *live_columns,
             oa.c.alert_id.label("open_alert_id"),
             oa.c.status.label("open_alert_status"),
             oa.c.assigned_to.label("open_alert_assignee"),
@@ -344,11 +364,41 @@ def risk_summary_select(window_days: int = 30, limit_to=None) -> Select:
         .join(Student, Student.student_pk == Enrollment.student_pk)
         .join(Department, Department.dept_id == Student.dept_id)
         .join(Course, Course.course_pk == Enrollment.course_pk)
+    )
+    if live:
+        stmt = (
+            stmt.outerjoin(att, att.c.enrollment_id == Enrollment.enrollment_id)
+            .outerjoin(aca, aca.c.enrollment_id == Enrollment.enrollment_id)
+            .outerjoin(act, act.c.enrollment_id == Enrollment.enrollment_id)
+        )
+    return (
+        stmt.outerjoin(lr, lr.c.enrollment_id == Enrollment.enrollment_id)
+        .outerjoin(oa, oa.c.enrollment_id == Enrollment.enrollment_id)
+    )
+
+
+def live_figures_select(enrollment_ids, window_days: int = 30) -> Select:
+    """The three display-only figures, for a page's worth of enrolments.
+
+    The companion to ``risk_summary_select(live=False)``: same three
+    columns, same meaning, computed for twenty enrolments instead of
+    every one in the database.
+    """
+    att = attendance_sq(enrollment_ids)
+    aca = academics_sq(enrollment_ids)
+    act = activity_sq(window_days, limit_to=enrollment_ids)
+    return (
+        select(
+            Enrollment.enrollment_id,
+            att.c.attendance_percentage.label("live_attendance_percentage"),
+            aca.c.avg_assessment_percentage.label("live_assessment_percentage"),
+            act.c.last_activity_at.label("last_activity_at"),
+        )
+        .select_from(Enrollment)
         .outerjoin(att, att.c.enrollment_id == Enrollment.enrollment_id)
         .outerjoin(aca, aca.c.enrollment_id == Enrollment.enrollment_id)
         .outerjoin(act, act.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(lr, lr.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(oa, oa.c.enrollment_id == Enrollment.enrollment_id)
+        .where(Enrollment.enrollment_id.in_(enrollment_ids))
     )
 
 
@@ -399,44 +449,79 @@ def alerts_select_full() -> Select:
     )
 
 
-def student_stats_sq(window_days: int = 30) -> Subquery:
-    """Per-student roll-up across all of a student's enrolments.
+def student_risk_counts_sq() -> Subquery:
+    """The half of the student summary that the list filters and sorts on.
 
-    Powers the academic + engagement summary on the student list and the
-    student profile header. ``highest_risk_score`` deliberately ignores
-    rows whose category is ``INSUFFICIENT_DATA`` so an unscored profile
-    is never presented as if it had been assessed.
+    Enrolment counts, the worst banded score and the open-alert count.
+    All of it comes from ``enrollments`` joined to the latest risk row and
+    the open alert -- no attendance, academics or activity aggregate is
+    involved, so this stays cheap however much fact data exists.
+
+    ``highest_risk_score`` deliberately ignores rows whose category is
+    ``INSUFFICIENT_DATA`` so an unscored profile is never presented as if
+    it had been assessed.
     """
-    att, aca, act = attendance_sq(), academics_sq(), activity_sq(window_days)
     lr, oa = latest_risk_sq(), open_alert_sq()
     banded = lr.c.risk_category.in_(("LOW", "MEDIUM", "HIGH"))
     return (
         select(
             Enrollment.student_pk.label("student_pk"),
             func.count(func.distinct(Enrollment.enrollment_id)).label("enrolled_courses"),
-            func.round(func.avg(att.c.attendance_percentage), 2).label("attendance_percentage"),
-            func.round(func.avg(aca.c.avg_assessment_percentage), 2).label(
-                "avg_assessment_percentage"
-            ),
             func.max(case((banded, lr.c.risk_score))).label("highest_risk_score"),
             func.sum(case((lr.c.risk_category == "HIGH", 1), else_=0)).label("high_risk_courses"),
             func.sum(case((lr.c.risk_category == "MEDIUM", 1), else_=0)).label(
                 "medium_risk_courses"
             ),
-            func.coalesce(func.sum(aca.c.late_submissions), 0).label("late_submissions"),
-            func.coalesce(func.sum(aca.c.missing_submissions), 0).label("missing_submissions"),
-            func.max(act.c.last_activity_at).label("last_activity_at"),
             func.count(oa.c.alert_id).label("open_alerts"),
+        )
+        .select_from(Enrollment)
+        .outerjoin(lr, lr.c.enrollment_id == Enrollment.enrollment_id)
+        .outerjoin(oa, oa.c.enrollment_id == Enrollment.enrollment_id)
+        .where(Enrollment.status == "ACTIVE")
+        .group_by(Enrollment.student_pk)
+        .subquery("scounts")
+    )
+
+
+def student_live_stats_select(student_pks, window_days: int = 30) -> Select:
+    """The display-only half of the student summary, for one page.
+
+    Averaged attendance and marks, submission counts and last-seen. These
+    are shown but never filtered, sorted or counted on, so the list can
+    select its page first and ask for these only for the students on it.
+
+    Splitting the summary this way is safe because every join involved is
+    at most one row per enrolment: dropping the three aggregates cannot
+    change ``enrolled_courses``, the risk counts or ``open_alerts``, and
+    adding them back for twenty students cannot change these five.
+    """
+    enrolments = select(Enrollment.enrollment_id).where(
+        Enrollment.student_pk.in_(student_pks), Enrollment.status == "ACTIVE"
+    )
+    att = attendance_sq(enrolments)
+    aca = academics_sq(enrolments)
+    act = activity_sq(window_days, limit_to=enrolments)
+    return (
+        select(
+            Enrollment.student_pk.label("student_pk"),
+            func.round(func.avg(att.c.attendance_percentage), 2).label(
+                "attendance_percentage"
+            ),
+            func.round(func.avg(aca.c.avg_assessment_percentage), 2).label(
+                "avg_assessment_percentage"
+            ),
+            func.coalesce(func.sum(aca.c.late_submissions), 0).label("late_submissions"),
+            func.coalesce(func.sum(aca.c.missing_submissions), 0).label(
+                "missing_submissions"
+            ),
+            func.max(act.c.last_activity_at).label("last_activity_at"),
         )
         .select_from(Enrollment)
         .outerjoin(att, att.c.enrollment_id == Enrollment.enrollment_id)
         .outerjoin(aca, aca.c.enrollment_id == Enrollment.enrollment_id)
         .outerjoin(act, act.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(lr, lr.c.enrollment_id == Enrollment.enrollment_id)
-        .outerjoin(oa, oa.c.enrollment_id == Enrollment.enrollment_id)
-        .where(Enrollment.status == "ACTIVE")
+        .where(Enrollment.student_pk.in_(student_pks), Enrollment.status == "ACTIVE")
         .group_by(Enrollment.student_pk)
-        .subquery("sstats")
     )
 
 

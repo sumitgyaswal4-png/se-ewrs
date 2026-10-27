@@ -252,11 +252,13 @@ department's template.
   - State that both fixes were proven byte-identical before and after
     (80 enrolments for the procedure; 157 API responses for the
     endpoints), so they were optimisations and not behaviour changes.
-  - The limitation that remains (§9.4): the two paginated lists, and why
-    that one was left documented rather than speculatively "fixed" —
-    unlike the single-entity reads, restricting a list's aggregates to
-    its page is not provably equivalent, because the page is not known
-    until the query has run.
+  - **The paginated lists** (§9.4), which is the subtlest of the three:
+    a list cannot restrict its aggregates to its page, because the page
+    is not known until the query has run — but it does not need to,
+    because nothing selects the page *by* those aggregates. Choosing the
+    page first and aggregating only it gives 10× and 12×. The reasoning
+    is the interesting part: the fix came from reading what each
+    endpoint filters, sorts and counts on, not from tuning anything.
 
 8.5 **Concurrency** — the duplicate-alert guard under real contention:
   20 threads racing to open one alert (1 succeeded, 19 refused by the
@@ -272,13 +274,13 @@ department's template.
 9.1 What was achieved, against the objectives in §1.3
 9.2 What was learned
 9.3 Limitations — rule-based model, no live LMS integration, single
-  institution, and the measured cost of the two paginated list endpoints
-  above a few thousand enrolments (`docs/database_design.md` §9.4)
+  institution, and no incremental recalculation (a full run re-scores
+  every enrolment rather than only those whose data changed)
 
-9.4 Future work — paginate-then-aggregate for the list endpoints (the
-  known remedy for §9.4), statistical/ML scoring validated against real
-  outcomes, live LMS integration, notifications, a student-facing view,
-  and fairness auditing of the model across demographic groups
+9.4 Future work — incremental recalculation, statistical/ML scoring
+  validated against real outcomes, live LMS integration, notifications,
+  a student-facing view, and fairness auditing of the model across
+  demographic groups
 
 ---
 

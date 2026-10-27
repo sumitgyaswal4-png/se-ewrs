@@ -25,7 +25,7 @@ from app.schemas.risk import (
     RiskRow,
 )
 from app.services import audit, risk_engine
-from app.services.queries import risk_summary_select
+from app.services.queries import live_figures_select, risk_summary_select
 
 router = APIRouter(dependencies=[Depends(require_permissions(P_RISK_READ))])
 
@@ -100,7 +100,12 @@ def list_risk(
     sort_dir: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[RiskRow]:
     """Latest risk score per (student, course) with the supporting figures."""
-    stmt = risk_summary_select().where(Enrollment.status == "ACTIVE")
+    # Select the page without the attendance/academics/activity aggregates.
+    # Nothing below filters, sorts or counts on them -- they supply three
+    # display columns -- so leaving them out cannot change which rows come
+    # back, and it stops MySQL aggregating every fact row in the database
+    # to return twenty. They are filled in for the page further down.
+    stmt = risk_summary_select(live=False).where(Enrollment.status == "ACTIVE")
 
     if search:
         pattern = f"%{search.strip()}%"
@@ -135,7 +140,26 @@ def list_risk(
     # NULL scores (unscored profiles) always sort last, whichever direction.
     order = [column.is_(None)]
     order.append(column.desc() if sort_dir == "desc" else column.asc())
-    rows = db.execute(outer.order_by(*order).offset(page.offset).limit(page.limit)).mappings()
+    rows = [
+        dict(r)
+        for r in db.execute(
+            outer.order_by(*order).offset(page.offset).limit(page.limit)
+        ).mappings()
+    ]
+
+    # Now the three live columns, for this page's enrolments only.
+    ids = [r["enrollment_id"] for r in rows]
+    if ids:
+        live = {
+            r["enrollment_id"]: r
+            for r in db.execute(live_figures_select(ids)).mappings()
+        }
+        for row in rows:
+            figures = live.get(row["enrollment_id"])
+            if figures is not None:
+                row["live_attendance_percentage"] = figures["live_attendance_percentage"]
+                row["live_assessment_percentage"] = figures["live_assessment_percentage"]
+                row["last_activity_at"] = figures["last_activity_at"]
 
     return Page.build(
         [_row_from_mapping(r) for r in rows], total, page.page, page.page_size
