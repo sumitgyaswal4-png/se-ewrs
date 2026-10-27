@@ -220,12 +220,17 @@ def student_profile(student_pk: int, db: DbSession) -> StudentProfile:
     last_activity = None
 
     for row in rows:
-        attendance = _as_float(row["attendance_percentage"]) or _as_float(
-            row["live_attendance_percentage"]
-        )
-        assessment = _as_float(row["avg_assessment_percentage"]) or _as_float(
-            row["live_assessment_percentage"]
-        )
+        # Fall back to the live figure only when there is no stored one.
+        # `or` would not do: 0.0 is falsy, and a stored 0% belongs to
+        # precisely the student this system exists to catch, so losing it
+        # would show them full attendance on their own profile and
+        # disagree with the risk detail page for the same enrolment.
+        attendance = _as_float(row["attendance_percentage"])
+        if attendance is None:
+            attendance = _as_float(row["live_attendance_percentage"])
+        assessment = _as_float(row["avg_assessment_percentage"])
+        if assessment is None:
+            assessment = _as_float(row["live_assessment_percentage"])
         score = _as_float(row["risk_score"])
         category = row["risk_category"]
         courses.append(

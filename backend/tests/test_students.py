@@ -207,3 +207,64 @@ def test_list_includes_an_aggregated_summary_per_student(client, as_admin, seede
     summary = response.json()["items"][0]["summary"]
     assert summary["enrolled_courses"] == 1
     assert summary["attendance_percentage"] == 75.0
+
+
+def test_profile_keeps_a_stored_zero_instead_of_falling_back_to_live(
+    client, as_admin, seeded, db
+):
+    """A stored 0% must not be mistaken for "no stored value".
+
+    The profile shows the snapshot the risk run recorded and falls back to
+    a live figure only when there is no snapshot. 0.0 is a snapshot - and
+    it belongs to exactly the student this system exists to catch - so it
+    must survive. Guarding the fallback with `or` instead of an explicit
+    None check silently replaced it with the live number, which also made
+    the profile disagree with the risk detail page for the same enrolment.
+    """
+    from datetime import date, timedelta
+
+    from app.models import AttendanceRecord, RiskAssessment
+
+    enrollment = seeded.enrollments[0]
+
+    # Live attendance is clearly non-zero: two sessions, both attended.
+    for index in range(2):
+        db.add(
+            AttendanceRecord(
+                enrollment_id=enrollment.enrollment_id,
+                session_date=date.today() - timedelta(days=index + 1),
+                session_no=index + 1,
+                status="PRESENT",
+                recorded_by=2,
+            )
+        )
+
+    # The stored snapshot says 0% for both figures.
+    db.add(
+        RiskAssessment(
+            enrollment_id=enrollment.enrollment_id,
+            risk_score=100,
+            risk_category="HIGH",
+            data_completeness="COMPLETE",
+            attendance_percentage=0,
+            avg_assessment_percentage=0,
+            engagement_score=0,
+            attendance_risk=100,
+            academic_risk=100,
+            engagement_risk=100,
+            model_version="rule-v1",
+        )
+    )
+    db.commit()
+
+    body = client.get(
+        f"/api/students/{enrollment.student_pk}/profile", headers=as_admin
+    ).json()
+    row = next(
+        course
+        for course in body["courses"]
+        if course["enrollment_id"] == enrollment.enrollment_id
+    )
+
+    assert row["attendance_percentage"] == 0.0, "stored 0% was replaced by the live figure"
+    assert row["avg_assessment_percentage"] == 0.0
