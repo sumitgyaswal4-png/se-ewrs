@@ -163,7 +163,7 @@ department's template.
 
 7.1 Strategy — unit, integration, end-to-end
 
-7.2 **Backend tests** — 406 tests, what each file covers
+7.2 **Backend tests** — 407 tests, what each file covers
   > **Table:** test file → what it verifies → count
   > **Screenshot:** the `pytest` summary line
 
@@ -242,8 +242,21 @@ department's template.
     it was an optimisation and not a behaviour change.
   - Index usage: the `EXPLAIN` showing `ix_lms_enrollment_time` as a
     covering range scan reading 26 rows of 270,000.
-  - The measured composite-read limitation (§9.3) and why it was left
-    documented rather than speculatively "fixed".
+  - **The same bug in the application layer** (§9.3), which is the more
+    interesting half because it cost a *page* rather than a batch job:
+    endpoints that wanted one enrolment filtered the result of a
+    whole-table aggregate, so opening one student's profile took 3.4 s
+    and now takes 81 ms. Four endpoints, 21x to 57x. Make the point that
+    the same mistake appeared independently in SQL and in Python,
+    because it is a way of thinking about queries, not a typo.
+  - State that both fixes were proven byte-identical before and after
+    (80 enrolments for the procedure; 157 API responses for the
+    endpoints), so they were optimisations and not behaviour changes.
+  - The limitation that remains (§9.4): the two paginated lists, and why
+    that one was left documented rather than speculatively "fixed" —
+    unlike the single-entity reads, restricting a list's aggregates to
+    its page is not provably equivalent, because the page is not known
+    until the query has run.
 
 8.5 **Concurrency** — the duplicate-alert guard under real contention:
   20 threads racing to open one alert (1 succeeded, 19 refused by the
@@ -259,11 +272,11 @@ department's template.
 9.1 What was achieved, against the objectives in §1.3
 9.2 What was learned
 9.3 Limitations — rule-based model, no live LMS integration, single
-  institution, and the measured composite-read cost above a few thousand
-  enrolments (`docs/database_design.md` §9.3)
+  institution, and the measured cost of the two paginated list endpoints
+  above a few thousand enrolments (`docs/database_design.md` §9.4)
 
 9.4 Future work — paginate-then-aggregate for the list endpoints (the
-  known remedy for §9.3), statistical/ML scoring validated against real
+  known remedy for §9.4), statistical/ML scoring validated against real
   outcomes, live LMS integration, notifications, a student-facing view,
   and fairness auditing of the model across demographic groups
 

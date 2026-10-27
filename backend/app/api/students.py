@@ -207,10 +207,13 @@ def student_profile(student_pk: int, db: DbSession) -> StudentProfile:
     if student is None:
         raise NotFoundError(f"Student {student_pk} was not found")
 
+    of_this_student = select(Enrollment.enrollment_id).where(
+        Enrollment.student_pk == student_pk
+    )
     rows = db.execute(
-        risk_summary_select().where(Enrollment.student_pk == student_pk).order_by(
-            Enrollment.enrollment_id
-        )
+        risk_summary_select(limit_to=of_this_student)
+        .where(Enrollment.student_pk == student_pk)
+        .order_by(Enrollment.enrollment_id)
     ).mappings()
 
     courses: List[StudentCourseRow] = []

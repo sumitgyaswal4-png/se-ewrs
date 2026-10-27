@@ -212,7 +212,9 @@ def risk_detail(enrollment_id: int, db: DbSession) -> RiskDetail:
     the re-normalisation is visible rather than implied.
     """
     row = db.execute(
-        risk_summary_select().where(Enrollment.enrollment_id == enrollment_id)
+        risk_summary_select(limit_to=[enrollment_id]).where(
+            Enrollment.enrollment_id == enrollment_id
+        )
     ).mappings().one_or_none()
     if row is None:
         raise NotFoundError(f"Enrolment {enrollment_id} was not found")

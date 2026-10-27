@@ -228,7 +228,9 @@ def get_alert(alert_id: int, db: DbSession) -> AlertDetail:
 
     risk_row = None
     summary = db.execute(
-        risk_summary_select().where(Enrollment.enrollment_id == alert.enrollment_id)
+        risk_summary_select(limit_to=[alert.enrollment_id]).where(
+            Enrollment.enrollment_id == alert.enrollment_id
+        )
     ).mappings().one_or_none()
     if summary is not None:
         from app.api.risk import _row_from_mapping

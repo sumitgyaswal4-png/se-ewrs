@@ -507,12 +507,48 @@ type: range   key: ix_lms_enrollment_time   rows: 26   Extra: Using index
 
 26 rows examined out of 270,000.
 
-### 9.3 A known limitation: composite reads at scale
+### 9.3 The same bug in the application layer
 
-The composite reads -- `student_risk_summary` and the equivalent
-SQLAlchemy statements behind the student, course and risk list endpoints
--- do **not** scale linearly, and this is a real limitation rather than a
-tuning detail.
+The access-path bug of section 9.1 was not only in SQL. Every roll-up in
+`services/queries.py` groups a whole fact table by `enrollment_id`, and
+the endpoints that wanted *one* enrolment filtered the result of that
+aggregate rather than restricting the aggregate itself. MySQL therefore
+grouped all 144,000 attendance rows, all 270,000 activity rows and all
+30,000 results in order to return a single student's figures.
+
+Opening one student's profile on the 6,000-enrolment dataset took 3.4
+seconds. Not a scale concern -- a page.
+
+The fix is the one section 9.1 applies in SQL: push the predicate inside
+the aggregate. Each roll-up now takes an optional `limit_to`, and the
+four endpoints that already know which enrolments they want pass it:
+
+| Endpoint | Before | After | |
+|---|---|---|---|
+| `GET /api/students/{pk}/profile` | 3,377 ms | **81 ms** | 42x |
+| `GET /api/risk-assessments/{id}` | 3,725 ms | **79 ms** | 47x |
+| `GET /api/courses/{pk}/roster` | 3,381 ms | **160 ms** | 21x |
+| `GET /api/alerts/{id}` | 3,496 ms | **61 ms** | 57x |
+
+Restricting a `GROUP BY enrollment_id` to a set of `enrollment_id`s can
+only remove groups the caller was going to discard, so the change cannot
+alter a result. That argument was checked rather than trusted: every
+risk detail, every student profile, every course roster and every alert
+in the demo database -- **157 responses** -- were captured before and
+after and compared. They are identical byte for byte.
+
+### 9.4 What is still slow: the paginated lists
+
+`GET /api/students` and `GET /api/risk-assessments` were **not** fixed
+and still take 8-9 s on the 6,000-enrolment dataset.
+
+They are a harder problem than the single-entity reads, and honestly so.
+A list computes aggregates for the whole filtered set in order to return
+one page of 20, but it cannot simply restrict them to the page: the page
+is not known until the query has run, and `student_stats_sq` genuinely
+aggregates the live figures rather than merely displaying them. The fix
+is to select the page's keys first and aggregate only those -- two round
+trips instead of one -- which is a different and larger change.
 
 Measured on the 6,000-enrolment dataset:
 
@@ -524,28 +560,16 @@ Measured on the 6,000-enrolment dataset:
 | latest-risk window function | 227 ms |
 | **the five joined together** | **5,711 ms** |
 
-The parts cost ~1.3 s; composed they cost 5.7 s. MySQL materialises each
-derived table and then joins them with auto-generated keys, and that join
-dominates. End to end this shows as 5-9 s for `GET /api/students`,
-`GET /api/risk-assessments` and `GET /api/dashboard/summary`.
+The parts cost ~1.3 s; composed they cost 5.7 s, because MySQL
+materialises each derived table and then joins them with auto-generated
+keys. At the demo's scale, and at a realistic single-department scale of
+a few hundred enrolments, both endpoints are effectively instant; the
+limitation appears only above a few thousand.
 
-**Why it is not a problem for this project:** at the demo's scale -- and
-at a realistic single-department scale of a few hundred enrolments --
-every one of these is effectively instant. The limitation only appears
-above a few thousand enrolments.
-
-**The remedy, if it ever mattered:** the aggregates are computed for the
-whole dataset in order to return one page of 20 rows. Paginating the
-enrolments *first* and aggregating only that page's `enrollment_id`s
-turns the cost from O(all rows) into O(page). Alternatives are a
-materialised summary table refreshed on recalculation, or simply reading
-the snapshot columns already stored on `risk_assessments` instead of
-recomputing the live figures. Each is a contained change to
-`services/queries.py`; none was made here because it is outside what the
-project needs, and an unverified optimisation is worse than a documented
-limitation.
-
----
+Leaving it is a deliberate choice, and the same one as before: the
+project does not need it, and an unverified optimisation is worse than a
+documented limitation. The difference from section 9.3 is that there the
+equivalence argument was provable and was proved.
 
 ## 10. Keeping SQL and Python in step
 

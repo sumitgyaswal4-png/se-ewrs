@@ -264,8 +264,9 @@ def course_roster(course_pk: int, db: DbSession) -> List[dict]:
     if db.get(Course, course_pk) is None:
         raise NotFoundError(f"Course {course_pk} was not found")
 
+    of_this_course = select(Enrollment.enrollment_id).where(Enrollment.course_pk == course_pk)
     rows = db.execute(
-        risk_summary_select()
+        risk_summary_select(limit_to=of_this_course)
         .where(Enrollment.course_pk == course_pk, Enrollment.status == "ACTIVE")
         .order_by(Student.student_id)
     ).mappings()

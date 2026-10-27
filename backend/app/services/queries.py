@@ -12,6 +12,19 @@ deployment) and on SQLite (the pytest suite), so the test-suite exercises
 the real aggregation logic rather than a stub. The MySQL views remain the
 database-side definition of record and are what ``analytics_queries.sql``
 queries directly.
+
+**The ``limit_to`` argument.** Every roll-up here groups a whole fact
+table by ``enrollment_id``. A caller that wants one enrolment's figures
+can filter the *result* of that aggregate, but MySQL will still group
+the entire table first and throw almost all of it away -- the same trap
+that made ``sp_recalculate_risk_for_enrollment`` 132x slower than it
+needed to be, documented in ``docs/database_design.md`` section 9.
+Passing ``limit_to`` instead pushes the enrolment predicate *inside* the
+aggregate, so the index is used and the work is proportional to what the
+caller asked for. It never changes which rows come back or what they
+contain: restricting a ``GROUP BY enrollment_id`` to a set of
+``enrollment_id``s can only remove groups the caller was going to
+discard anyway.
 """
 
 from __future__ import annotations
@@ -38,6 +51,22 @@ from app.models import (
 ATTENDED = ("PRESENT", "LATE")
 
 
+def _restrict(stmt, column, limit_to):
+    """Push an ``enrollment_id`` predicate inside an aggregate.
+
+    ``limit_to`` is anything ``IN`` accepts: a list of ids, or a SELECT.
+    A SELECT is explicitly un-correlated, because these subqueries name
+    the same tables as the statement they end up inside and SQLAlchemy
+    would otherwise helpfully correlate them into something that means
+    something else entirely.
+    """
+    if limit_to is None:
+        return stmt
+    if isinstance(limit_to, Select):
+        limit_to = limit_to.correlate(None).scalar_subquery()
+    return stmt.where(column.in_(limit_to))
+
+
 def _pct(numerator, denominator):
     """``ROUND(100 * n / NULLIF(d, 0), 2)`` -- NULL instead of divide-by-zero."""
     return func.round(100.0 * numerator / func.nullif(denominator, 0), 2)
@@ -46,7 +75,7 @@ def _pct(numerator, denominator):
 # ---------------------------------------------------------------------------
 # Per-enrolment roll-ups
 # ---------------------------------------------------------------------------
-def attendance_sq() -> Subquery:
+def attendance_sq(limit_to=None) -> Subquery:
     """Mirrors ``v_enrollment_attendance``.
 
     LATE counts as attended -- the student was present. EXCUSED absences
@@ -55,7 +84,7 @@ def attendance_sq() -> Subquery:
     """
     held = func.sum(case((AttendanceRecord.status != "EXCUSED", 1), else_=0))
     attended = func.sum(case((AttendanceRecord.status.in_(ATTENDED), 1), else_=0))
-    return (
+    stmt = (
         select(
             AttendanceRecord.enrollment_id.label("enrollment_id"),
             func.count(AttendanceRecord.attendance_id).label("sessions_recorded"),
@@ -74,11 +103,11 @@ def attendance_sq() -> Subquery:
             func.max(AttendanceRecord.session_date).label("last_session_date"),
         )
         .group_by(AttendanceRecord.enrollment_id)
-        .subquery("att")
     )
+    return _restrict(stmt, AttendanceRecord.enrollment_id, limit_to).subquery("att")
 
 
-def academics_sq() -> Subquery:
+def academics_sq(limit_to=None) -> Subquery:
     """Mirrors ``v_enrollment_academics``.
 
     Only rows with ``marks_obtained IS NOT NULL`` feed the average, so an
@@ -86,7 +115,7 @@ def academics_sq() -> Subquery:
     """
     graded_pct = case((AssessmentResult.marks_obtained.is_not(None), AssessmentResult.percentage))
     graded_flag = case((AssessmentResult.marks_obtained.is_not(None), 1), else_=0)
-    return (
+    stmt = (
         select(
             AssessmentResult.enrollment_id.label("enrollment_id"),
             func.count(AssessmentResult.result_id).label("results_recorded"),
@@ -119,11 +148,11 @@ def academics_sq() -> Subquery:
             ).label("last_assessment_at"),
         )
         .group_by(AssessmentResult.enrollment_id)
-        .subquery("aca")
     )
+    return _restrict(stmt, AssessmentResult.enrollment_id, limit_to).subquery("aca")
 
 
-def activity_sq(window_days: int = 30, today: Optional[date] = None) -> Subquery:
+def activity_sq(window_days: int = 30, today: Optional[date] = None, limit_to=None) -> Subquery:
     """Mirrors ``v_enrollment_activity``.
 
     ``login_count_30d`` is windowed; ``last_activity_at`` is not, so a
@@ -134,7 +163,7 @@ def activity_sq(window_days: int = 30, today: Optional[date] = None) -> Subquery
     is_login_in_window = and_(
         LmsActivityLog.activity_type == "LOGIN", LmsActivityLog.activity_at >= window_start
     )
-    return (
+    stmt = (
         select(
             LmsActivityLog.enrollment_id.label("enrollment_id"),
             func.count(LmsActivityLog.activity_id).label("total_activities"),
@@ -152,11 +181,11 @@ def activity_sq(window_days: int = 30, today: Optional[date] = None) -> Subquery
             func.max(LmsActivityLog.activity_at).label("last_activity_at"),
         )
         .group_by(LmsActivityLog.enrollment_id)
-        .subquery("act")
     )
+    return _restrict(stmt, LmsActivityLog.enrollment_id, limit_to).subquery("act")
 
 
-def latest_risk_sq() -> Subquery:
+def latest_risk_sq(limit_to=None) -> Subquery:
     """Mirrors ``v_latest_risk``.
 
     Uses ``ROW_NUMBER() OVER (PARTITION BY enrollment_id ORDER BY
@@ -167,13 +196,16 @@ def latest_risk_sq() -> Subquery:
         partition_by=RiskAssessment.enrollment_id,
         order_by=(RiskAssessment.calculated_at.desc(), RiskAssessment.risk_id.desc()),
     )
-    ranked = select(RiskAssessment, rn.label("rn")).subquery("ranked")
+    inner = _restrict(
+        select(RiskAssessment, rn.label("rn")), RiskAssessment.enrollment_id, limit_to
+    )
+    ranked = inner.subquery("ranked")
     return select(ranked).where(ranked.c.rn == 1).subquery("lr")
 
 
-def open_alert_sq() -> Subquery:
+def open_alert_sq(limit_to=None) -> Subquery:
     """At most one open alert per enrolment -- guaranteed by the unique key."""
-    return (
+    stmt = (
         select(
             RiskAlert.enrollment_id.label("enrollment_id"),
             RiskAlert.alert_id.label("alert_id"),
@@ -181,16 +213,18 @@ def open_alert_sq() -> Subquery:
             RiskAlert.assigned_to.label("assigned_to"),
         )
         .where(RiskAlert.active_flag == 1)
-        .subquery("oa")
     )
+    return _restrict(stmt, RiskAlert.enrollment_id, limit_to).subquery("oa")
 
 
 # ---------------------------------------------------------------------------
 # Composite selects
 # ---------------------------------------------------------------------------
-def performance_select(window_days: int = 30) -> Select:
+def performance_select(window_days: int = 30, limit_to=None) -> Select:
     """Mirrors ``student_performance_view``: one row per (student, course)."""
-    att, aca, act = attendance_sq(), academics_sq(), activity_sq(window_days)
+    att = attendance_sq(limit_to)
+    aca = academics_sq(limit_to)
+    act = activity_sq(window_days, limit_to=limit_to)
     return (
         select(
             Enrollment.enrollment_id,
@@ -245,10 +279,19 @@ def performance_select(window_days: int = 30) -> Select:
     )
 
 
-def risk_summary_select(window_days: int = 30) -> Select:
-    """Mirrors ``student_risk_summary``: performance + latest risk + alert."""
-    att, aca, act = attendance_sq(), academics_sq(), activity_sq(window_days)
-    lr, oa = latest_risk_sq(), open_alert_sq()
+def risk_summary_select(window_days: int = 30, limit_to=None) -> Select:
+    """Mirrors ``student_risk_summary``: performance + latest risk + alert.
+
+    Pass ``limit_to`` when the caller already knows which enrolments it
+    wants -- one enrolment, one student's, one course's. Without it the
+    five aggregates below are each computed over the whole database and
+    then filtered, which is correct but costs the same whether you asked
+    for one row or all of them.
+    """
+    att = attendance_sq(limit_to)
+    aca = academics_sq(limit_to)
+    act = activity_sq(window_days, limit_to=limit_to)
+    lr, oa = latest_risk_sq(limit_to), open_alert_sq(limit_to)
     return (
         select(
             Enrollment.enrollment_id,

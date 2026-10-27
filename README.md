@@ -592,7 +592,7 @@ dates, so the demo stays current whenever it is loaded.
 
 ## 15. Testing
 
-### Backend — 406 tests, 83% coverage
+### Backend — 407 tests, 83% coverage
 
 ```bash
 cd backend
@@ -653,7 +653,7 @@ se-ewrs/
 │   │   ├── schemas/      Pydantic request/response models
 │   │   ├── services/     risk_engine, queries, audit, assessment rules
 │   │   └── main.py       application entry point
-│   ├── tests/            406 tests
+│   ├── tests/            407 tests
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -922,7 +922,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 406 backend tests pass (83% coverage); 92 frontend tests pass
+- 407 backend tests pass (83% coverage); 92 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a
@@ -955,17 +955,39 @@ enrolments and every field matched, including the generated
 contributing-factors text. Details in
 [`docs/database_design.md` §9](docs/database_design.md).
 
+**The same bug was in the application layer**, and cost a page rather
+than a batch job: the endpoints that want one enrolment's figures
+filtered the *result* of a whole-table aggregate instead of restricting
+the aggregate. Opening one student's profile took 3.4 s. The roll-ups in
+`services/queries.py` now take an optional `limit_to` that pushes the
+enrolment predicate inside the aggregate:
+
+| Endpoint | Before | After | |
+|---|---|---|---|
+| `GET /api/students/{pk}/profile` | 3,377 ms | **81 ms** | 42× |
+| `GET /api/risk-assessments/{id}` | 3,725 ms | **79 ms** | 47× |
+| `GET /api/courses/{pk}/roster` | 3,381 ms | **160 ms** | 21× |
+| `GET /api/alerts/{id}` | 3,496 ms | **61 ms** | 57× |
+
+Verified the same way: **157 responses** — every risk detail, student
+profile, course roster and alert in the demo database — captured before
+and after and compared byte for byte. Identical. And where `limit_to` is
+not passed, the compiled SQL is unchanged, so nothing else moved.
+
 ### Not verified, and one measured limitation
 
-- **Composite reads above a few thousand enrolments.** At 6,000
-  enrolments the student, risk and dashboard endpoints take 5–9 s. The
-  cause is measured and understood (MySQL materialises five derived
-  aggregate tables and the join dominates: the parts cost 1.3 s, composed
-  5.7 s), and the remedy is known — paginate the enrolments before
-  aggregating. It was **not** fixed, because the project does not need it
+- **The two paginated lists above a few thousand enrolments.** At 6,000
+  enrolments `GET /api/students` and `GET /api/risk-assessments` take
+  8–9 s. The cause is measured and understood (MySQL materialises five
+  derived aggregate tables and the join dominates: the parts cost 1.3 s,
+  composed 5.7 s), and the remedy is known — select the page's keys
+  first and aggregate only those. It was **not** fixed: a list cannot
+  simply restrict its aggregates to the page, because the page is not
+  known until the query has run, so unlike the single-entity reads below
+  the change is not provably equivalent. The project does not need it,
   and an unverified optimisation is worse than a documented limitation.
-  At the demo's scale, and at a realistic department scale, these are
-  instant. See [`docs/database_design.md` §9.3](docs/database_design.md).
+  At the demo's scale, and at a realistic department scale, both are
+  instant. See [`docs/database_design.md` §9.4](docs/database_design.md).
 - MySQL was verified on **8.0.46 on Linux**. Other 8.0.x patch releases
   and other platforms should behave identically but were not tried.
 
