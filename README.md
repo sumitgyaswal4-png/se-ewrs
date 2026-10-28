@@ -692,6 +692,7 @@ se-ewrs/
 │   ├── database_design.md    design decisions, risk spec, full SQL reference
 │   ├── api_documentation.md  endpoint reference with examples
 │   ├── user_guide.md         guide for the five staff roles
+│   ├── report.md             the full written report (nine chapters)
 │   ├── report_outline.md     chapter skeleton for the written submission
 │   └── screenshots/          15 captioned screenshots of the running app
 ├── .env.example
@@ -949,8 +950,9 @@ barrier so they fire at the same instant):
 | 12 threads enrol the same student in the same course | **1 enrolled, 11 refused** |
 
 The second is the realistic one: two staff pressing **Recalculate** at
-the same moment. The constraint holds, and at 6,000 enrolments the full
-run produced 4,050 alerts with **zero** enrolments holding two.
+the same moment. The constraint holds, and a full run over the 6,000
+enrolments that `./database/scale_test.sh` generates raises **1,748
+alerts with zero enrolments holding two**.
 
 **At scale** — a synthetic dataset 170× the demo (2,000 students, 6,000
 enrolments, ~450,000 fact rows). This is where stress-testing earned its

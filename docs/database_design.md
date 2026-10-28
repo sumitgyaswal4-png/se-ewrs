@@ -420,7 +420,7 @@ SELECT action, entity_type, entity_id, old_values, new_values
 |---|---|
 | Normalised schema (3NF) | `schema.sql`; justified in `er_diagram.md` §5 |
 | Primary keys | every table |
-| Foreign keys | 25 constraints with explicit `ON UPDATE` / `ON DELETE` |
+| Foreign keys | 27 constraints with explicit `ON UPDATE` / `ON DELETE` |
 | Unique constraints | `uq_enrollment_student_course`, `uq_attendance_session`, `uq_result_assessment_enrollment`, `uq_alert_one_active_per_enrollment`, `uq_courses_code_term`, `uq_assessment_course_title`, `uq_course_instructor` |
 | CHECK constraints | semester, year, credits, marks, weights, score range, follow-up date |
 | Indexes | §6 of `er_diagram.md`; `EXPLAIN` demo in Q15 |
