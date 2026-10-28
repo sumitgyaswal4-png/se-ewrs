@@ -592,7 +592,7 @@ dates, so the demo stays current whenever it is loaded.
 
 ## 15. Testing
 
-### Backend — 407 tests, 83% coverage
+### Backend — 483 tests, 83% coverage
 
 ```bash
 cd backend
@@ -610,7 +610,7 @@ and every router under test are the same code that runs against MySQL.
 | `test_auth.py` | 19 | Sign-in, tokens, expiry, forged signatures, hashing, no hash exposure |
 | `test_rbac.py` | 96 | Every (role, endpoint) pair against the permission matrix |
 | `test_risk_engine.py` | 47 | The formula, bands, clamping, rounding, engagement rules, **missing-data handling** |
-| `test_students.py` | 20 | CRUD, search, filters, sorting, soft delete, profile |
+| `test_students.py` | 21 | CRUD, search, filters, sorting, soft delete, profile |
 | `test_courses.py` | 17 | CRUD, instructor assignment, roster, term uniqueness |
 | `test_enrollments.py` | 16 | Duplicate prevention, bulk skip, status changes |
 | `test_attendance.py` | 16 | Recording, idempotency, **percentage calculation**, excused handling |
@@ -621,6 +621,18 @@ and every router under test are the same code that runs against MySQL.
 | `test_reports.py` | 27 | Report accuracy against hand-computed figures, CSV export |
 | `test_system.py` | 23 | Health, settings validation, audit trail, error envelopes, SQL-injection payload |
 | `test_seed.py` | 27 | Demo dataset properties, risk spread, reseed idempotency |
+| `test_api_docs.py` | 76 | Every served endpoint is documented; every documented permission matches what is enforced |
+
+**`test_api_docs.py` checks the documentation itself.** It reads the
+routes off the running app and the tables out of
+[`docs/api_documentation.md`](docs/api_documentation.md), then asserts
+that every served endpoint has a row and that no row claims a stricter
+permission than the code enforces. A permission column that overstates
+the rule reads like a security guarantee while being fiction, so it is
+tested rather than trusted. Both failure modes were confirmed by
+deliberately introducing them: an undocumented endpoint and a row
+claiming `attendance:write` where `attendance:read` is enforced were
+each caught.
 
 ### Frontend — 92 tests
 
@@ -653,7 +665,7 @@ se-ewrs/
 │   │   ├── schemas/      Pydantic request/response models
 │   │   ├── services/     risk_engine, queries, audit, assessment rules
 │   │   └── main.py       application entry point
-│   ├── tests/            407 tests
+│   ├── tests/            483 tests
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -924,7 +936,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 407 backend tests pass (83% coverage); 92 frontend tests pass
+- 483 backend tests pass (83% coverage); 92 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a

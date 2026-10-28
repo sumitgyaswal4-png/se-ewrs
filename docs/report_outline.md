@@ -163,7 +163,7 @@ department's template.
 
 7.1 Strategy — unit, integration, end-to-end
 
-7.2 **Backend tests** — 407 tests, what each file covers
+7.2 **Backend tests** — 483 tests, what each file covers
   > **Table:** test file → what it verifies → count
   > **Screenshot:** the `pytest` summary line
 
