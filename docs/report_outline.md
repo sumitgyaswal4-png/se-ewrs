@@ -163,11 +163,11 @@ department's template.
 
 7.1 Strategy — unit, integration, end-to-end
 
-7.2 **Backend tests** — 526 tests, what each file covers
+7.2 **Backend tests** — 533 tests, what each file covers
   > **Table:** test file → what it verifies → count
   > **Screenshot:** the `pytest` summary line
 
-7.3 **Frontend tests** — 98 tests across formatting, components, charts,
+7.3 **Frontend tests** — 100 tests across formatting, components, charts,
   navigation, the data hook and the status-colour helper
 
 7.4 **Selected test cases** — present 8–10 as a formal table

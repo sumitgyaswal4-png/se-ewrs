@@ -9,6 +9,7 @@ Interactive API documentation is served at ``/docs`` (Swagger UI) and
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -114,5 +115,8 @@ def health() -> dict:
         "status": "ok" if database == "connected" else "degraded",
         "database": database,
         "dialect": engine.dialect.name,
+        # The deployed commit, which Render sets; lets a deploy pipeline
+        # confirm the new code is the code answering. None when unset.
+        "commit": os.environ.get("RENDER_GIT_COMMIT"),
     }
 

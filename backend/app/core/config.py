@@ -50,6 +50,11 @@ class Settings(BaseSettings):
     db_echo: bool = False
     db_pool_size: int = 10
     db_pool_recycle: int = 1800
+    # TLS to a remote MySQL: the CA certificate that signed the server's,
+    # given as the PEM text itself or as a path to a .pem file. When set,
+    # the connection is encrypted and both the certificate and the host
+    # name are verified. Managed services (Aiven, for one) require it.
+    db_ssl_ca: Optional[str] = None
 
     # --- authentication -------------------------------------------------
     # No default: a key written in the source is public, and anyone who has
@@ -62,6 +67,12 @@ class Settings(BaseSettings):
     login_max_failures_per_account: int = 5
     login_max_failures_per_address: int = 20
     login_failure_window_seconds: int = 900  # 15 minutes
+    # How many reverse proxies stand in front of the app. 0 (direct, and
+    # local development): the caller is the socket's peer. 1 (one hosting
+    # proxy, as on Render): the caller is the right-most X-Forwarded-For
+    # entry, the one that proxy added itself. Entries further left are
+    # whatever the client chose to send, so they are never trusted.
+    trusted_proxy_hops: int = 0
 
     # --- CORS -----------------------------------------------------------
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

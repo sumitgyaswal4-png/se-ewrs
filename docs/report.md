@@ -129,8 +129,8 @@ between ten-fold and one-hundred-and-thirty-two-fold.
   - [6.6 Security](#66-security)
 - [Chapter 7 — Testing](#chapter-7--testing)
   - [7.1 Strategy](#71-strategy)
-  - [7.2 Backend tests — 526](#72-backend-tests--526)
-  - [7.3 Frontend tests — 98](#73-frontend-tests--98)
+  - [7.2 Backend tests — 533](#72-backend-tests--533)
+  - [7.3 Frontend tests — 100](#73-frontend-tests--100)
   - [7.4 Selected test cases](#74-selected-test-cases)
   - [7.5 Coverage](#75-coverage)
   - [7.6 Defects found during testing](#76-defects-found-during-testing)
@@ -1094,13 +1094,13 @@ their unit tests while being visibly broken, and one piece of
 documentation drifted without anything failing. Tests that only exercise
 the layer they were written for will miss both.
 
-### 7.2 Backend tests — 526
+### 7.2 Backend tests — 533
 
 **Table 7.1 — Backend test files**
 
 | File | Tests | What it verifies |
 |---|---|---|
-| `test_auth.py` | 31 | Login, token expiry, password change, user management, failed-login throttling |
+| `test_auth.py` | 34 | Login, token expiry, password change, user management, failed-login throttling |
 | `test_rbac.py` | 96 | The full permission matrix — every role against every guarded endpoint |
 | `test_students.py` | 21 | CRUD, search, filters, soft delete, the profile view |
 | `test_courses.py` | 17 | Catalogue, instructors, roster |
@@ -1112,11 +1112,11 @@ the layer they were written for will miss both.
 | `test_alerts.py` | 30 | Generation, **duplicate prevention at the constraint**, transitions |
 | `test_interventions.py` | 22 | Recording, alert linkage, date validation |
 | `test_reports.py` | 36 | Report figures against hand-computed values, CSV export and its formula escaping, unscored profiles kept out of every mean |
-| `test_system.py` | 36 | Health, settings, audit trail, error envelopes, an injection payload, the startup `SECRET_KEY` checks, database URL encoding |
+| `test_system.py` | 40 | Health, settings, audit trail, error envelopes, an injection payload, the startup `SECRET_KEY` checks, database URL encoding and TLS |
 | `test_seed.py` | 27 | Dataset properties, risk spread, reseed idempotency |
 | `test_api_docs.py` | 76 | Every endpoint documented; every documented permission matches enforcement |
 | `test_report_docs.py` | 8 | This report: appendices match their sources; figures, tables, citations and contents agree |
-| **Total** | **526** | |
+| **Total** | **533** | |
 
 `test_api_docs.py` deserves a note. It reads the routes off the
 application's own router table and the tables out of the API reference,
@@ -1129,7 +1129,7 @@ undocumented endpoint, and changing a documented permission from
 `attendance:read` to `attendance:write`. Both were caught. A test that
 cannot fail proves nothing.
 
-### 7.3 Frontend tests — 98
+### 7.3 Frontend tests — 100
 
 Across formatting helpers (including that missing data renders as an em
 dash and never as `0%`), the risk badge, the data table's four states

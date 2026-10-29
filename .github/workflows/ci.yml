@@ -1,7 +1,13 @@
-# Continuous integration. Nothing is deployed: every job runs on a
-# throwaway runner, and the database is a MySQL container that is gone
-# when the job ends. No repository secrets are needed; the one key and
-# password each run uses are generated here and masked in the logs.
+# Continuous integration, then deployment of main.
+#
+# The test jobs run on a throwaway runner against a MySQL container that is
+# gone when the job ends; the key and password they use are generated per
+# run and masked. They need no repository secrets, so pull requests,
+# including ones from forks, run them without access to anything.
+#
+# The deploy jobs run only for a push to main, only after every test job
+# has passed, and only once the `production` environment is configured
+# (see docs/DEPLOYMENT.md). They never touch the database's schema or data.
 name: CI
 
 on:
@@ -40,12 +46,18 @@ jobs:
         run: python -m pytest -p no:cacheprovider -rs --cov=app --cov-report=term
 
   database:
-    name: MySQL scripts, parity and API smoke test
+    name: MySQL ${{ matrix.mysql }} scripts, parity and API smoke test
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.0 is what the project was built on; 8.4 is what the hosted
+        # database runs.
+        mysql: ["8.0", "8.4"]
     services:
       mysql:
-        image: mysql:8.0
+        image: mysql:${{ matrix.mysql }}
         env:
           # A disposable container reachable only from this job's runner.
           MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
@@ -153,3 +165,117 @@ jobs:
             echo "The demo password is in the production bundle."; exit 1
           fi
           echo "No demo credentials in dist/."
+
+  # -------------------------------------------------------------------------
+  # Deployment
+  # -------------------------------------------------------------------------
+  deploy-api:
+    name: Deploy the API to Render
+    needs: [backend, database, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.API_BASE_URL != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.API_BASE_URL }}/health
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
+    steps:
+      - name: Ask Render to deploy this commit
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          separator='?'; case "$HOOK" in *\?*) separator='&';; esac
+          curl -fsS -X POST "${HOOK}${separator}ref=${GITHUB_SHA}" -o /dev/null
+          echo "Deploy of ${GITHUB_SHA} requested."
+
+      # A deploy is only done when the new commit is the one answering and
+      # it can reach its database. A free service may also be waking up.
+      - name: Wait until this commit is live and healthy
+        env:
+          API: ${{ vars.API_BASE_URL }}
+        run: |
+          deadline=$(( $(date +%s) + 1500 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            body="$(curl -fsS --max-time 60 "${API}/health" || true)"
+            if [ -n "$body" ] && python3 - "$body" <<'PY'
+          import json, os, sys
+          health = json.loads(sys.argv[1])
+          print(f"commit={health.get('commit')} status={health.get('status')} database={health.get('database')}")
+          ok = (health.get("commit") == os.environ["GITHUB_SHA"]
+                and health.get("status") == "ok" and health.get("database") == "connected")
+          sys.exit(0 if ok else 1)
+          PY
+            then
+              echo "Commit ${GITHUB_SHA} is live and connected to its database."; exit 0
+            fi
+            sleep 20
+          done
+          echo "The API did not report this commit as healthy within 25 minutes."; exit 1
+
+  deploy-web:
+    name: Deploy the frontend to Cloudflare Pages
+    needs: [deploy-api]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      deployments: write
+    environment:
+      name: production
+      url: ${{ vars.FRONTEND_URL }}
+    concurrency:
+      group: deploy-web
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      # VITE_* values end up in the public bundle: only the API's public
+      # address and a timeout go here, never a secret.
+      - name: Build for production
+        env:
+          VITE_API_BASE_URL: ${{ vars.API_BASE_URL }}
+          VITE_API_TIMEOUT_MS: "90000"
+        run: npm run build
+      - name: Check the bundle before publishing it
+        env:
+          API: ${{ vars.API_BASE_URL }}
+        run: |
+          if grep -rl 'Demo@12345' dist/; then echo "Demo password in the bundle."; exit 1; fi
+          # A dev address with a port means a misconfigured build. (axios
+          # itself carries a bare "http://localhost" fallback, so not that.)
+          if grep -rlE 'localhost:[0-9]|127\.0\.0\.1' dist/assets/; then echo "A local address is in the bundle."; exit 1; fi
+          grep -rqF "${API%/}" dist/assets/ || { echo "The bundle does not point at ${API}."; exit 1; }
+          echo "Bundle checked."
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: frontend
+          command: pages deploy dist --project-name=${{ vars.CLOUDFLARE_PAGES_PROJECT }} --branch=main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+      # Pages serves index.html for unknown paths, so a refreshed deep link
+      # must come back 200 rather than 404.
+      - name: Check the published site, including a deep link
+        env:
+          SITE: ${{ vars.FRONTEND_URL }}
+        run: |
+          for path in / /login /students /reports; do
+            for attempt in $(seq 10); do
+              code="$(curl -s -o /dev/null -w '%{http_code}' "${SITE%/}${path}")"
+              [ "$code" = 200 ] && break
+              sleep 6
+            done
+            echo "${path}: ${code}"; [ "$code" = 200 ] || exit 1
+          done

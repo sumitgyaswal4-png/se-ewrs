@@ -1,6 +1,11 @@
 """Smoke-test a running API over HTTP, against the demo data.
 
     python -m scripts.api_smoke_test http://127.0.0.1:8000 [--allow-writes]
+        [--accounts FILE]
+
+``--accounts`` names the private file scripts/init_remote_db.py writes,
+whose "email  password" lines replace the published demo password on a
+deployed database. Without it the seed's shared password is used.
 
 Checks what the unit tests cannot, because they use SQLite and an
 in-process client: the real server, on MySQL, through real HTTP.
@@ -67,7 +72,14 @@ def main(argv=None) -> int:
     parser.add_argument("base_url")
     parser.add_argument("--allow-writes", action="store_true",
                         help="also run step 5, which renames and restores a course")
+    parser.add_argument("--accounts", help="file of 'email  password' lines")
     args = parser.parse_args(argv)
+    passwords = {}
+    if args.accounts:
+        for line in open(args.accounts):
+            parts = line.split()
+            if len(parts) == 2 and "@" in parts[0] and not line.startswith("#"):
+                passwords[parts[0]] = parts[1]
     base = args.base_url.rstrip("/")
     http = httpx.Client(base_url=base, timeout=60)
     problems = []
@@ -78,7 +90,8 @@ def main(argv=None) -> int:
             problems.append(label)
         return not ok
 
-    def login(email, password=PASSWORD):
+    def login(email, password=None):
+        password = password or passwords.get(email, PASSWORD)
         return http.post("/api/auth/login", json={"email": email, "password": password})
 
     # 1 -----------------------------------------------------------------

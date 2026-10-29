@@ -371,3 +371,40 @@ def test_the_right_password_on_a_deactivated_account_is_not_a_failure(client, se
         )
         assert response.status_code == 401
         assert "deactivated" in response.json()["detail"].lower()
+
+
+def _spray(client, headers_for):
+    """One failure per fresh email, so only the address limit can stop it."""
+    codes = []
+    for n in range(24):
+        codes.append(client.post(
+            "/api/auth/login",
+            json={"email": f"spray{n}@test.edu", "password": "wrong"},
+            headers=headers_for(n),
+        ).status_code)
+    return codes
+
+
+def test_a_forged_forwarded_for_cannot_dodge_the_address_limit(client, seeded, monkeypatch):
+    """Behind one proxy, a client that prepends a new fake address to every
+    guess is still one caller: the proxy's own entry is the right-most."""
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "trusted_proxy_hops", 1)
+    codes = _spray(client, lambda n: {"X-Forwarded-For": f"203.0.113.{n}, 198.51.100.7"})
+    assert codes[:20] == [401] * 20
+    assert set(codes[20:]) == {429}
+
+
+def test_callers_behind_the_proxy_are_told_apart(client, seeded, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "trusted_proxy_hops", 1)
+    codes = _spray(client, lambda n: {"X-Forwarded-For": f"198.51.100.{n}"})
+    assert codes == [401] * 24  # 24 different real callers, one failure each
+
+
+def test_without_a_proxy_the_forwarded_header_is_ignored(client, seeded):
+    codes = _spray(client, lambda n: {"X-Forwarded-For": f"198.51.100.{n}"})
+    assert codes[:20] == [401] * 20
+    assert set(codes[20:]) == {429}

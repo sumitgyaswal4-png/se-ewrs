@@ -443,6 +443,10 @@ rather than using `root`, and serve over HTTPS.
 
 ## 12. Installation
 
+This section runs the system on your own machine. To put it on the
+internet on free tiers (Cloudflare Pages, Render, Aiven MySQL) with
+GitHub Actions, see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ### Prerequisites
 
 | | Version | Check |
@@ -611,7 +615,7 @@ dates, so the demo stays current whenever it is loaded.
 
 ## 15. Testing
 
-### Backend — 526 tests, 93% coverage
+### Backend — 533 tests, 93% coverage
 
 ```bash
 cd backend
@@ -626,7 +630,7 @@ and every router under test are the same code that runs against MySQL.
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_auth.py` | 31 | Sign-in, tokens, expiry, forged signatures, hashing, no hash exposure, failed-login throttling |
+| `test_auth.py` | 34 | Sign-in, tokens, expiry, forged signatures, hashing, no hash exposure, failed-login throttling |
 | `test_rbac.py` | 96 | Every (role, endpoint) pair against the permission matrix |
 | `test_risk_engine.py` | 48 | The formula, bands, clamping, rounding, engagement rules, **missing-data handling** |
 | `test_students.py` | 21 | CRUD, search, filters, sorting, soft delete, profile |
@@ -638,7 +642,7 @@ and every router under test are the same code that runs against MySQL.
 | `test_alerts.py` | 30 | Generation, **duplicate prevention at the constraint**, transitions, auto-resolution |
 | `test_interventions.py` | 22 | Recording, alert linkage, date validation, follow-up queue |
 | `test_reports.py` | 36 | Report accuracy against hand-computed figures, CSV export and its formula escaping |
-| `test_system.py` | 36 | Health, settings validation, audit trail, error envelopes, SQL-injection payload, startup `SECRET_KEY` checks, database URL encoding |
+| `test_system.py` | 40 | Health, settings validation, audit trail, error envelopes, SQL-injection payload, startup `SECRET_KEY` checks, database URL encoding and TLS |
 | `test_seed.py` | 27 | Demo dataset properties, risk spread, reseed idempotency |
 | `test_api_docs.py` | 76 | Every served endpoint is documented; every documented permission matches what is enforced |
 | `test_report_docs.py` | 8 | The written report: appendices match the files they copy; figures, tables, citations and contents are numbered, listed and resolve |
@@ -654,7 +658,7 @@ deliberately introducing them: an undocumented endpoint and a row
 claiming `attendance:write` where `attendance:read` is enforced were
 each caught.
 
-### Frontend — 98 tests
+### Frontend — 100 tests
 
 ```bash
 cd frontend
@@ -686,7 +690,7 @@ se-ewrs/
 │   │   ├── schemas/      Pydantic request/response models
 │   │   ├── services/     risk_engine, queries, audit, assessment rules
 │   │   └── main.py       application entry point
-│   ├── tests/            526 tests
+│   ├── tests/            533 tests
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -962,7 +966,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 526 backend tests pass (93% coverage); 98 frontend tests pass
+- 533 backend tests pass (93% coverage); 100 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a

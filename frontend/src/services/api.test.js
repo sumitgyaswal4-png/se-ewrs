@@ -3,7 +3,7 @@
 import { AxiosError } from 'axios'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ApiError, api, setUnauthorisedHandler } from './api.js'
+import { ApiError, api, apiBaseUrl, setUnauthorisedHandler } from './api.js'
 
 /** An adapter that answers every request with the given status and body. */
 function respondWith(status, data, headers = {}) {
@@ -51,5 +51,17 @@ describe('API error handling', () => {
 
     await expect(api.get('/students', { adapter: expired })).rejects.toMatchObject({ status: 401 })
     expect(onUnauthorised).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('API base URL', () => {
+  it('uses the dev-server proxy when no backend origin is configured', () => {
+    expect(apiBaseUrl(undefined)).toBe('/api')
+    expect(apiBaseUrl('')).toBe('/api')
+  })
+
+  it("points at the deployed backend's /api, however the origin is written", () => {
+    expect(apiBaseUrl('https://se-ewrs-api.onrender.com')).toBe('https://se-ewrs-api.onrender.com/api')
+    expect(apiBaseUrl('https://se-ewrs-api.onrender.com/')).toBe('https://se-ewrs-api.onrender.com/api')
   })
 })

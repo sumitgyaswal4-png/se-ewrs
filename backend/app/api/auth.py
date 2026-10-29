@@ -60,6 +60,22 @@ login_limiter = FailedLoginLimiter(
 
 
 def _client_ip(request: Request) -> Optional[str]:
+    """The caller's address, for the login limiter and the audit trail.
+
+    Behind ``trusted_proxy_hops`` proxies it is read from the right of
+    X-Forwarded-For: a client can prepend any address it likes, but only
+    the proxies append. Trusting the left-most entry let one machine send a
+    new fake address with every guess and never meet the address limit.
+    """
+    hops = settings.trusted_proxy_hops
+    if hops:
+        forwarded = [
+            entry.strip()
+            for entry in request.headers.get("x-forwarded-for", "").split(",")
+            if entry.strip()
+        ]
+        if len(forwarded) >= hops:
+            return forwarded[-hops]
     return request.client.host if request.client else None
 
 

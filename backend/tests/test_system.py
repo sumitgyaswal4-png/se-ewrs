@@ -343,3 +343,62 @@ def test_the_seed_cli_never_prints_part_of_a_password():
     assert "cret" not in printed and "tail" not in printed
     assert printed == "mysql+pymysql://app:***@db.internal:3306/se_ewrs"
     assert "hunter2" not in _mask("not a url hunter2")
+
+
+def _throwaway_ca_pem() -> str:
+    from datetime import datetime, timedelta, timezone
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test CA")])
+    now = datetime.now(timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+@pytest.mark.parametrize("given_as", ["pem text", "file path"])
+def test_database_tls_verifies_the_server_and_its_host_name(tmp_path, given_as):
+    """A provider's CA can arrive as the certificate text (a secret setting)
+    or as a file; either way the connection must check certificate and host."""
+    import ssl
+
+    from app.db.session import _tls_context
+
+    pem = _throwaway_ca_pem()
+    if given_as == "file path":
+        path = tmp_path / "ca.pem"
+        path.write_text(pem)
+        pem = str(path)
+    context = _tls_context(pem)
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+    assert len(context.get_ca_certs()) == 1
+
+
+def test_a_bad_database_ca_fails_at_startup_rather_than_going_unencrypted():
+    import ssl
+
+    from app.db.session import _tls_context
+
+    with pytest.raises(ssl.SSLError):
+        _tls_context("-----BEGIN CERTIFICATE-----\nnot a certificate\n-----END CERTIFICATE-----\n")
+
+
+def test_health_names_the_deployed_commit(client, monkeypatch):
+    assert client.get("/health").json()["commit"] is None
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "abc123")
+    assert client.get("/health").json()["commit"] == "abc123"

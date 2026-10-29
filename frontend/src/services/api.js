@@ -64,9 +64,18 @@ export class ApiError extends Error {
   }
 }
 
+/** Where the API lives. In development Vite proxies /api on this origin;
+ * a production build served from another host sets VITE_API_BASE_URL to
+ * the backend's origin (e.g. https://se-ewrs-api.onrender.com). */
+export function apiBaseUrl(origin = import.meta.env.VITE_API_BASE_URL) {
+  return origin ? `${origin.replace(/\/+$/, '')}/api` : '/api'
+}
+
 export const api = axios.create({
-  baseURL: '/api',
-  timeout: 30_000,
+  baseURL: apiBaseUrl(),
+  // A free host that has gone to sleep takes about a minute to wake, so a
+  // deployment raises this with VITE_API_TIMEOUT_MS.
+  timeout: Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30_000,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -89,7 +98,10 @@ api.interceptors.response.use(
   (error) => {
     if (error.code === 'ECONNABORTED') {
       return Promise.reject(
-        new ApiError('The request timed out. Is the backend still running?', { status: 0 }),
+        new ApiError(
+          'The request timed out. The server may be waking up; try again in a minute.',
+          { status: 0 },
+        ),
       )
     }
     if (!error.response) {

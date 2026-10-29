@@ -1,0 +1,56 @@
+# Render Blueprint for the SE-EWRS API (free web service).
+#
+# Create it once from the Render dashboard: New > Blueprint > this repo.
+# Render then asks for every value marked `sync: false`; nothing secret is
+# stored in this file. Deploys are started by GitHub Actions (see
+# .github/workflows/ci.yml) only after every CI job passes, so automatic
+# deploys on commit are switched off here.
+services:
+  - type: web
+    name: se-ewrs-api
+    runtime: python
+    plan: free
+    # Cannot be changed after creation; keep it near the database's region.
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # uvicorn's own forwarded-header handling is off: trusting every proxy
+    # ("*") would take the left-most X-Forwarded-For entry, which the client
+    # writes. The app reads the entry Render's proxy adds instead
+    # (TRUSTED_PROXY_HOPS below).
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --no-proxy-headers
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      # Render's default is newer than the version the suite is tested on.
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DEBUG
+        value: "false"
+      # One proxy (Render's) stands in front: the caller is the right-most
+      # X-Forwarded-For entry, for the login limiter and the audit trail.
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      # A random 256-bit value, made by Render once and kept across deploys.
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_NAME
+        value: se_ewrs
+      # The least-privilege account, never the provider's admin user.
+      - key: DB_USER
+        value: se_ewrs_app
+      - key: DB_PASSWORD
+        sync: false
+      # The provider's CA certificate as PEM text; turns on verified TLS.
+      - key: DB_SSL_CA
+        sync: false
+      # A free MySQL allows few connections; keep the pool small.
+      - key: DB_POOL_SIZE
+        value: "5"
+      # The frontend's exact origin, e.g. https://se-ewrs.pages.dev
+      - key: CORS_ORIGINS
+        sync: false

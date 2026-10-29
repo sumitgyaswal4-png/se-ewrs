@@ -4,6 +4,8 @@ Sessions are handed to request handlers by the ``get_db`` dependency,
 which guarantees a rollback on failure and a close in every case.
 """
 
+import ssl
+from pathlib import Path
 from typing import Generator
 
 from sqlalchemy import create_engine, event
@@ -12,6 +14,19 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import settings
+
+
+def _tls_context(ca: str) -> ssl.SSLContext:
+    """A context that verifies the server against ``ca`` and its host name.
+
+    ``ca`` is the PEM text itself (as a hosting provider's secret setting
+    holds it) or a path to a .pem file.
+    """
+    pem = ca if "-----BEGIN CERTIFICATE-----" in ca else Path(ca).read_text()
+    context = ssl.create_default_context(cadata=pem)
+    context.check_hostname = True
+    context.verify_mode = ssl.CERT_REQUIRED
+    return context
 
 
 def _build_engine() -> Engine:
@@ -36,8 +51,13 @@ def _build_engine() -> Engine:
 
         return engine
 
+    connect_args = {}
+    if settings.db_ssl_ca:
+        connect_args["ssl"] = _tls_context(settings.db_ssl_ca)
+
     return create_engine(
         url,
+        connect_args=connect_args,
         echo=settings.db_echo,
         pool_pre_ping=True,
         pool_size=settings.db_pool_size,

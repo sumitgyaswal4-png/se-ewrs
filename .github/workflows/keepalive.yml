@@ -1,0 +1,40 @@
+# Keeps the free deployment awake.
+#
+# Render's free web service sleeps after 15 minutes without traffic and
+# takes about a minute to wake; Aiven may power off a free database that
+# sees no activity. /health answers from the API *and* runs a query, so
+# one request every ten minutes keeps both up. A single always-on free
+# service uses ~744 of the 750 instance hours Render gives each month.
+#
+# GitHub may delay scheduled runs, and pauses them after 60 days without
+# a commit to the repository; re-enable it from the Actions tab if so.
+name: Keep alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    if: vars.API_BASE_URL != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Ping the API's health check
+        env:
+          API: ${{ vars.API_BASE_URL }}
+        run: |
+          body="$(curl -fsS --retry 3 --retry-delay 20 --max-time 90 "${API}/health")"
+          echo "$body"
+          case "$body" in
+            *'"database":"connected"'*) ;;
+            *) echo "::warning::The API answered but reports its database as not connected." ;;
+          esac
