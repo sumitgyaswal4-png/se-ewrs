@@ -26,7 +26,7 @@ height first, let it settle, then take an ordinary screenshot.
 
 | # | File | What it shows |
 |---|---|---|
-| 1 | `01-login.png` | The login page, with the demo accounts listed and a **Use** button that fills the form. The password field never leaves the browser in plain form: it is sent once and exchanged for a JWT. |
+| 1 | `01-login.png` | The login page as `npm run dev` serves it, with the demo accounts listed and a **Use** button that fills the form (a production build omits that list). The password field never leaves the browser in plain form: it is sent once and exchanged for a JWT. |
 | 2 | `02-dashboard-admin.png` | The administrator dashboard. Every tile and both charts are aggregated by SQL from the recorded data — no figure on this page is hard-coded. The risk-distribution bar carries a legend, direct counts and a matching table, so the bands never depend on colour alone. |
 | 3 | `03-students-filtered-high-risk.png` | Student management with the **Risk band = High** filter applied, narrowing 36 students to the 5 who have a high-risk enrolment. Filtering happens in SQL with bound parameters, not in the browser. |
 | 4 | `04-student-profile.png` | One student across all their courses: attendance and assessment meters, per-course risk bands, and the open alerts raised for them. |

@@ -4,13 +4,13 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 SQLAlchemy==2.0.36
 PyMySQL==1.1.1
-cryptography==43.0.3          # required by PyMySQL for caching_sha2_password
+cryptography==50.0.2          # required by PyMySQL for caching_sha2_password
 pydantic==2.9.2
 pydantic-settings==2.6.1
 email-validator==2.2.0
-PyJWT==2.9.0
+PyJWT==2.15.1
 argon2-cffi==23.1.0
-python-multipart==0.0.17
+python-multipart==0.0.32
 
 # testing
 pytest==8.3.4

@@ -130,7 +130,7 @@ between ten-fold and one-hundred-and-thirty-two-fold.
 - [Chapter 7 — Testing](#chapter-7--testing)
   - [7.1 Strategy](#71-strategy)
   - [7.2 Backend tests — 526](#72-backend-tests--526)
-  - [7.3 Frontend tests — 92](#73-frontend-tests--92)
+  - [7.3 Frontend tests — 98](#73-frontend-tests--98)
   - [7.4 Selected test cases](#74-selected-test-cases)
   - [7.5 Coverage](#75-coverage)
   - [7.6 Defects found during testing](#76-defects-found-during-testing)
@@ -1129,12 +1129,13 @@ undocumented endpoint, and changing a documented permission from
 `attendance:read` to `attendance:write`. Both were caught. A test that
 cannot fail proves nothing.
 
-### 7.3 Frontend tests — 92
+### 7.3 Frontend tests — 98
 
 Across formatting helpers (including that missing data renders as an em
 dash and never as `0%`), the risk badge, the data table's four states
 and server-side sorting, chart rendering, role-based navigation, the
-data-fetching hook's state machine, the login page, the status-colour
+data-fetching hook's state machine, API error handling, the login page
+(including that a production build omits the demo accounts), the status-colour
 helper and the trend chart.
 
 ### 7.4 Selected test cases

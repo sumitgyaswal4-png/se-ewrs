@@ -37,6 +37,10 @@ def main() -> int:
     rows = db.execute(text(
         "SELECT ra.* FROM risk_assessments ra JOIN v_latest_risk v ON v.risk_id = ra.risk_id"
     )).mappings().all()
+    if not rows:
+        # Nothing compared is not the same as nothing wrong.
+        print("No scored enrolments to compare: load database/seed.sql first.")
+        return 1
     mismatches = []
     for row in rows:
         metrics = collect_metrics(db, row["enrollment_id"], config)

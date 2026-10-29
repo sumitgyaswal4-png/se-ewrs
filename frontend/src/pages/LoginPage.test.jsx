@@ -2,7 +2,7 @@
 
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../services/endpoints.js', () => ({
   authApi: {
@@ -149,6 +149,36 @@ describe('LoginPage demo credentials', () => {
 
     expect(screen.getByLabelText(/email address/i)).toHaveValue('admin@se-ewrs.edu')
     expect(screen.getByLabelText(/^password$/i)).toHaveValue('Demo@12345')
+  })
+})
+
+describe('LoginPage demo panel by build', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('is hidden in a production build, password included', () => {
+    vi.stubEnv('DEV', false)
+    vi.stubEnv('PROD', true)
+    renderLogin()
+    expect(screen.queryByText('Demo accounts')).not.toBeInTheDocument()
+    expect(screen.queryByText('Demo@12345')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Use' })).not.toBeInTheDocument()
+    // Signing in itself is unaffected.
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+  })
+
+  it('can be switched on for a deliberate demo build', () => {
+    vi.stubEnv('DEV', false)
+    vi.stubEnv('PROD', true)
+    vi.stubEnv('VITE_SHOW_DEMO_ACCOUNTS', 'true')
+    renderLogin()
+    expect(screen.getByText('Demo accounts')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Use' })).toHaveLength(5)
+  })
+
+  it('can be switched off in development', () => {
+    vi.stubEnv('VITE_SHOW_DEMO_ACCOUNTS', 'false')
+    renderLogin()
+    expect(screen.queryByText('Demo accounts')).not.toBeInTheDocument()
   })
 })
 

@@ -130,7 +130,7 @@ def test_expired_token_is_rejected(client, seeded):
 def test_token_signed_with_another_key_is_rejected(client, seeded):
     forged = jwt.encode(
         {"sub": "admin@test.edu", "uid": 1, "role": "ADMIN", "exp": 9999999999},
-        "a-different-secret",
+        "a-different-secret-of-a-realistic-length-0123456789",
         algorithm="HS256",
     )
     response = client.get("/api/students", headers={"Authorization": f"Bearer {forged}"})

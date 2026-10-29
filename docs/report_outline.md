@@ -167,7 +167,7 @@ department's template.
   > **Table:** test file → what it verifies → count
   > **Screenshot:** the `pytest` summary line
 
-7.3 **Frontend tests** — 92 tests across formatting, components, charts,
+7.3 **Frontend tests** — 98 tests across formatting, components, charts,
   navigation, the data hook and the status-colour helper
 
 7.4 **Selected test cases** — present 8–10 as a formal table

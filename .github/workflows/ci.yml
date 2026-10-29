@@ -1,0 +1,155 @@
+# Continuous integration. Nothing is deployed: every job runs on a
+# throwaway runner, and the database is a MySQL container that is gone
+# when the job ends. No repository secrets are needed; the one key and
+# password each run uses are generated here and masked in the logs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      # tests/conftest.py points the suite at in-memory SQLite and sets its
+      # own SECRET_KEY, so this job needs no database and no secrets.
+      - name: Run the test suite
+        run: python -m pytest -p no:cacheprovider -rs --cov=app --cov-report=term
+
+  database:
+    name: MySQL scripts, parity and API smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          # A disposable container reachable only from this job's runner.
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=30
+    env:
+      ROOT_MYSQL: mysql --protocol=TCP -h 127.0.0.1 -P 3306 -u root
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Load schema, views, procedures, triggers and demo data
+        run: |
+          for script in schema views procedures triggers seed; do
+            echo "applying database/${script}.sql"
+            $ROOT_MYSQL < "database/${script}.sql" > "/tmp/${script}.log"
+          done
+          $ROOT_MYSQL -B se_ewrs -e \
+            'SELECT risk_category, COUNT(*) AS enrolments FROM v_latest_risk GROUP BY risk_category'
+
+      - name: Run every analytics query
+        run: $ROOT_MYSQL se_ewrs < database/analytics_queries.sql > /tmp/analytics.log
+
+      # The least-privilege account the README tells you to create. Its
+      # password is random for each run and deliberately holds @ : / # % ?
+      # so the backend's URL encoding is exercised against a real server.
+      - name: Create the application database user and a signing key
+        run: |
+          password="ci-$(openssl rand -hex 12)@:/#%?"
+          secret_key="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::${password}"
+          echo "::add-mask::${secret_key}"
+          $ROOT_MYSQL -e "
+            CREATE USER 'se_ewrs_app'@'%' IDENTIFIED BY '${password}';
+            GRANT SELECT, INSERT, UPDATE, DELETE ON se_ewrs.* TO 'se_ewrs_app'@'%';
+            GRANT EXECUTE ON se_ewrs.* TO 'se_ewrs_app'@'%';"
+          {
+            echo "DB_HOST=127.0.0.1"
+            echo "DB_PORT=3306"
+            echo "DB_USER=se_ewrs_app"
+            echo "DB_PASSWORD=${password}"
+            echo "DB_NAME=se_ewrs"
+            echo "SECRET_KEY=${secret_key}"
+            echo "DEBUG=false"
+          } >> "$GITHUB_ENV"
+
+      - name: Check the SQL procedure and the Python engine agree
+        working-directory: backend
+        run: python -m scripts.check_risk_parity
+
+      - name: Start the API
+        working-directory: backend
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/api.log 2>&1 &
+          for attempt in $(seq 30); do
+            if curl -fsS http://127.0.0.1:8000/health; then echo; exit 0; fi
+            sleep 1
+          done
+          echo "The API did not become healthy:"; cat /tmp/api.log; exit 1
+
+      - name: Smoke-test the API over HTTP
+        working-directory: backend
+        run: python -m scripts.api_smoke_test http://127.0.0.1:8000 --allow-writes
+
+      - name: Show the API log
+        if: failure()
+        run: cat /tmp/api.log || true
+
+  frontend:
+    name: Frontend tests, lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Run the tests
+        run: npm test
+      - name: Lint
+        run: npm run lint
+      - name: Build for production
+        run: npm run build
+      - name: Check the production bundle carries no demo credentials
+        run: |
+          if grep -rl 'Demo@12345' dist/; then
+            echo "The demo password is in the production bundle."; exit 1
+          fi
+          echo "No demo credentials in dist/."

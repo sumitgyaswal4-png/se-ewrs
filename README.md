@@ -591,7 +591,11 @@ them before any real use.
 | Academic Advisor | `deepak.sharma@se-ewrs.edu` | Alerts |
 | Department Chair | `latika.rao@se-ewrs.edu` | Reports |
 
-The login page lists these with a **Use** button that fills the form.
+In development (`npm run dev`) the login page lists these with a **Use**
+button that fills the form. A production build (`npm run build`) leaves
+the list and the password out entirely, because those accounts should
+not exist on a real deployment; build with `VITE_SHOW_DEMO_ACCOUNTS=true`
+for a deliberate demo site.
 
 **The demo data contains** 4 departments, 11 staff, 36 students, 6
 courses, 80 enrolments, ~1,700 attendance records, ~5,400 LMS events, 30
@@ -650,7 +654,7 @@ deliberately introducing them: an undocumented endpoint and a row
 claiming `attendance:write` where `attendance:read` is enforced were
 each caught.
 
-### Frontend — 92 tests
+### Frontend — 98 tests
 
 ```bash
 cd frontend
@@ -662,7 +666,8 @@ Covers formatting helpers (including that missing data renders as an em
 dash, never `0%`), the risk badge (icon and label always present, so
 colour is never the only cue), the data table's four states and
 server-side sorting, chart rendering, role-based navigation, the
-data-fetching hook's state machine, the login page, the meter colouring
+data-fetching hook's state machine, the API error handling (a 401 signs
+the user out, a 429 does not), the login page and its demo panel, the meter colouring
 (a poor figure must never be drawn in a reassuring colour) and the trend
 chart (a legend must never name a line the chart cannot draw).
 
@@ -957,7 +962,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 526 backend tests pass (93% coverage); 92 frontend tests pass
+- 526 backend tests pass (93% coverage); 98 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a

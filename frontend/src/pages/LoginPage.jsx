@@ -25,6 +25,21 @@ const DEMO_ACCOUNTS = [
 ]
 const DEMO_PASSWORD = 'Demo@12345'
 
+/** Whether to list the seeded demo accounts and their shared password.
+ *
+ * On in development, off in a production build, where those accounts
+ * should not exist. Set VITE_SHOW_DEMO_ACCOUNTS=true at build time for a
+ * deliberate demo site, or =false to hide it in development. Vite replaces
+ * these values when it builds, so a production bundle without the flag
+ * does not contain the password at all.
+ */
+function demoAccountsEnabled() {
+  return (
+    import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true' ||
+    (import.meta.env.DEV && import.meta.env.VITE_SHOW_DEMO_ACCOUNTS !== 'false')
+  )
+}
+
 export default function LoginPage() {
   const { signIn, isSignedIn, user, sessionExpired } = useAuth()
   const navigate = useNavigate()
@@ -236,38 +251,40 @@ export default function LoginPage() {
           </div>
 
           {/* Demo credentials, documented in the README. */}
-          <div className="card mt-4 p-5">
-            <p className="text-sm font-semibold text-slate-800">Demo accounts</p>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Seeded by <code className="font-mono">database/seed.sql</code>. Every account uses
-              the password{' '}
-              <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-slate-700">
-                {DEMO_PASSWORD}
-              </code>
-              .
-            </p>
-            <ul className="mt-3 divide-y divide-slate-100">
-              {DEMO_ACCOUNTS.map((account) => (
-                <li key={account.email} className="flex items-center justify-between gap-3 py-1.5">
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold text-slate-700">
-                      {account.role}
+          {demoAccountsEnabled() && (
+            <div className="card mt-4 p-5">
+              <p className="text-sm font-semibold text-slate-800">Demo accounts</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Seeded by <code className="font-mono">database/seed.sql</code>. Every account uses
+                the password{' '}
+                <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-slate-700">
+                  {DEMO_PASSWORD}
+                </code>
+                .
+              </p>
+              <ul className="mt-3 divide-y divide-slate-100">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <li key={account.email} className="flex items-center justify-between gap-3 py-1.5">
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-slate-700">
+                        {account.role}
+                      </span>
+                      <span className="block truncate font-mono text-[11px] text-slate-500">
+                        {account.email}
+                      </span>
                     </span>
-                    <span className="block truncate font-mono text-[11px] text-slate-500">
-                      {account.email}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => fillDemoAccount(account.email)}
-                    className="btn-ghost shrink-0 px-2 py-1 text-xs"
-                  >
-                    Use
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    <button
+                      type="button"
+                      onClick={() => fillDemoAccount(account.email)}
+                      className="btn-ghost shrink-0 px-2 py-1 text-xs"
+                    >
+                      Use
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
     </div>
