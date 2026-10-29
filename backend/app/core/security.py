@@ -1,6 +1,8 @@
 """Password hashing (Argon2id) and JWT issue / verification."""
 
+import secrets
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 import jwt
@@ -25,6 +27,21 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
         return _hasher.verify(password_hash, plain_password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
+
+
+@lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    """A digest no password matches, made with the same parameters as real ones."""
+    return _hasher.hash(secrets.token_urlsafe(32))
+
+
+def verify_dummy_password(plain_password: str) -> None:
+    """Spend the time a real verification would, for a login with no account.
+
+    Without this an unknown email returns about ten times faster than a
+    wrong password, so response time alone reveals which emails exist.
+    """
+    verify_password(plain_password, _dummy_hash())
 
 
 def needs_rehash(password_hash: str) -> bool:

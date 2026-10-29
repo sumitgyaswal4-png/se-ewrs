@@ -101,6 +101,7 @@ Validation failures add a `problems` array naming the offending fields
 | 404 | `not_found` | No such record |
 | 409 | `conflict` / `integrity_error` | Duplicate, or a disallowed state transition |
 | 422 | `validation_error` | Request body or query failed validation |
+| 429 | `too_many_requests` | Too many failed sign-ins; see `Retry-After` |
 | 500 | `internal_error` / `database_error` | Logged in full server-side; the client gets a generic message |
 
 ### Pagination
@@ -152,8 +153,11 @@ inclusive at both ends.
 }
 ```
 An unknown email and a wrong password both return the identical 401
-`"Incorrect email or password"`, so the endpoint cannot be used to
-enumerate accounts. Both outcomes are written to `audit_logs`.
+`"Incorrect email or password"`, and both cost one Argon2 verification
+(an unknown email is checked against a dummy digest), so neither the
+message nor the response time can be used to enumerate accounts. Both outcomes are written to `audit_logs`.
+
+After 5 failed attempts for one email, or 20 from one client address, within 15 minutes, the endpoint returns **429** `too_many_requests` with a `Retry-After` header (seconds) until the oldest failure leaves the window. The same applies to an email with no account, so a 429 does not reveal whether it exists. A successful sign-in clears that email's count.
 </details>
 
 ### 4.2 Reference data

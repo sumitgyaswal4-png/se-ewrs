@@ -102,6 +102,22 @@ describe('LoginPage authentication', () => {
     expect(localStorage.getItem('se-ewrs.token')).toBeNull()
   })
 
+  it('explains a throttled sign-in instead of calling it a wrong password', async () => {
+    authApi.login.mockRejectedValue(
+      new Error('Too many failed sign-in attempts. Try again in 15 minutes.'),
+    )
+
+    renderLogin()
+    await userEvent.type(screen.getByLabelText(/email address/i), 'admin@se-ewrs.edu')
+    await userEvent.type(screen.getByLabelText(/^password$/i), 'Demo@12345')
+    await userEvent.click(screen.getByRole('button', { name: /sign in/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/try again in 15 minutes/i)
+    expect(localStorage.getItem('se-ewrs.token')).toBeNull()
+    // The form stays usable, so the user can retry once the wait is over.
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeEnabled()
+  })
+
   it('surfaces an unreachable backend as an explanation, not a silent failure', async () => {
     authApi.login.mockRejectedValue(
       new Error('Could not reach the API. Check that the backend is running on port 8000.'),

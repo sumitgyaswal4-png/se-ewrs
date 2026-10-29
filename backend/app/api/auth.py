@@ -1,5 +1,6 @@
 """Authentication and user administration."""
 
+import math
 from datetime import datetime
 from typing import Annotated, List, Optional
 
@@ -8,9 +9,22 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import CurrentUser, DbSession, Pagination, require_permissions
 from app.core.config import settings
-from app.core.exceptions import AuthError, ConflictError, NotFoundError, ValidationError
+from app.core.exceptions import (
+    AuthError,
+    ConflictError,
+    NotFoundError,
+    TooManyRequestsError,
+    ValidationError,
+)
 from app.core.permissions import P_USERS_READ, P_USERS_WRITE, permissions_for
-from app.core.security import create_access_token, hash_password, needs_rehash, verify_password
+from app.core.rate_limit import FailedLoginLimiter
+from app.core.security import (
+    create_access_token,
+    hash_password,
+    needs_rehash,
+    verify_dummy_password,
+    verify_password,
+)
 from app.models import USER_ROLES, Department, User
 from app.schemas.auth import (
     LoginRequest,
@@ -37,6 +51,14 @@ HOME_ROUTES = {
 }
 
 
+#: One per process; see app/core/rate_limit.py for what that implies.
+login_limiter = FailedLoginLimiter(
+    max_per_account=settings.login_max_failures_per_account,
+    max_per_address=settings.login_max_failures_per_address,
+    window_seconds=settings.login_failure_window_seconds,
+)
+
+
 def _client_ip(request: Request) -> Optional[str]:
     return request.client.host if request.client else None
 
@@ -47,22 +69,42 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> LoginRespon
 
     The same message is returned for an unknown email and a wrong
     password, so the endpoint cannot be used to enumerate accounts.
+    Repeated failures are throttled with a 429 before any of that work.
     """
+    address = _client_ip(request)
+    attempt = login_limiter.reserve(payload.email, address)
+    if attempt is None:
+        wait = login_limiter.retry_after(payload.email, address) or 1
+        minutes = math.ceil(wait / 60)
+        raise TooManyRequestsError(
+            "Too many failed sign-in attempts. "
+            f"Try again in {minutes} minute{'s' if minutes != 1 else ''}.",
+            retry_after=wait,
+        )
+
     user = db.execute(
         select(User).where(func.lower(User.email) == payload.email.lower())
     ).scalar_one_or_none()
 
     generic = "Incorrect email or password"
+    if user is None:
+        # Same Argon2 cost as a real check, so timing cannot enumerate accounts.
+        verify_dummy_password(payload.password)
     if user is None or not verify_password(payload.password, user.password_hash):
+        # Already counted by reserve() above.
         audit.record(
             db,
             action="LOGIN_FAILED",
             entity_type="users",
             entity_id=payload.email,
-            ip_address=_client_ip(request),
+            ip_address=address,
             commit=True,
         )
         raise AuthError(generic)
+
+    # The password was right, so this attempt does not count as a failure,
+    # even when the account turns out to be deactivated.
+    login_limiter.release(payload.email, address, attempt)
 
     if not user.is_active:
         raise AuthError("This account has been deactivated. Contact an administrator.")
@@ -78,7 +120,7 @@ def login(payload: LoginRequest, request: Request, db: DbSession) -> LoginRespon
         entity_type="users",
         entity_id=user.user_id,
         user_id=user.user_id,
-        ip_address=_client_ip(request),
+        ip_address=address,
     )
     db.commit()
 

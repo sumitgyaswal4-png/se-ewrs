@@ -337,7 +337,10 @@ SELECT
     SUM(CASE WHEN srs.risk_category = 'LOW'    THEN 1 ELSE 0 END) AS low_risk,
     SUM(CASE WHEN srs.risk_category = 'INSUFFICIENT_DATA'
              THEN 1 ELSE 0 END)                          AS insufficient_data,
-    ROUND(AVG(srs.risk_score), 2)                        AS avg_risk_score,
+    -- An INSUFFICIENT_DATA row keeps the partial score of its one component;
+    -- it is not an assessment, so the mean leaves it out.
+    ROUND(AVG(CASE WHEN srs.risk_category IN ('LOW', 'MEDIUM', 'HIGH')
+                   THEN srs.risk_score END), 2)          AS avg_risk_score,
     ROUND(AVG(srs.attendance_percentage), 2)             AS avg_attendance_percentage,
     ROUND(AVG(srs.avg_assessment_percentage), 2)         AS avg_assessment_percentage,
     SUM(CASE WHEN srs.open_alert_id IS NOT NULL THEN 1 ELSE 0 END)

@@ -80,6 +80,16 @@ def db(engine) -> Session:
         session.close()
 
 
+@pytest.fixture(autouse=True)
+def _fresh_login_limiter():
+    """Failed sign-ins are counted per process; start every test at zero."""
+    from app.api.auth import login_limiter
+
+    login_limiter.reset()
+    yield
+    login_limiter.reset()
+
+
 @pytest.fixture
 def client(db) -> TestClient:
     """TestClient wired to the same session the test holds."""

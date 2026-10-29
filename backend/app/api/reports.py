@@ -44,6 +44,7 @@ from app.services.queries import (
     course_stats_sq,
     latest_risk_sq,
     risk_summary_select,
+    scored_risk,
 )
 
 dashboard_router = APIRouter(dependencies=[Depends(require_permissions(P_REPORTS_READ))])
@@ -317,7 +318,9 @@ def _risk_distribution_rows(
                 "insufficient_data"
             ),
             func.count().label("total"),
-            func.round(func.avg(sq.c.risk_score), 2).label("avg_risk_score"),
+            func.round(func.avg(scored_risk(sq.c.risk_score, sq.c.risk_category)), 2).label(
+                "avg_risk_score"
+            ),
         )
         .select_from(sq)
         .group_by(key_col, label_col)
@@ -708,7 +711,9 @@ def _department_risk_rows(db: DbSession) -> List[DepartmentRiskRow]:
             func.sum(case((sq.c.risk_category == "INSUFFICIENT_DATA", 1), else_=0)).label(
                 "insufficient_data"
             ),
-            func.round(func.avg(sq.c.risk_score), 2).label("avg_risk_score"),
+            func.round(func.avg(scored_risk(sq.c.risk_score, sq.c.risk_category)), 2).label(
+                "avg_risk_score"
+            ),
             func.round(func.avg(sq.c.live_attendance_percentage), 2).label(
                 "avg_attendance_percentage"
             ),
@@ -769,7 +774,9 @@ def _intervention_outcome_rows(
                 / func.nullif(func.count(), 0),
                 2,
             ).label("improvement_rate"),
-            func.round(func.avg(lr.c.risk_score), 2).label("avg_current_risk"),
+            func.round(func.avg(scored_risk(lr.c.risk_score, lr.c.risk_category)), 2).label(
+                "avg_current_risk"
+            ),
         )
         .select_from(Intervention)
         .outerjoin(lr, lr.c.enrollment_id == Intervention.enrollment_id)
@@ -824,6 +831,24 @@ CSV_REPORTS = (
 )
 
 
+#: A spreadsheet treats a cell starting with one of these as a formula.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: Any) -> Any:
+    """Keep text cells from being run as spreadsheet formulas.
+
+    Names come from data staff typed in, so a student recorded as
+    ``=HYPERLINK(...)`` would otherwise become a live link, or worse, for
+    whoever opens the export. A leading apostrophe makes the cell plain
+    text. Numbers are not strings here and pass through unchanged, so a
+    negative figure still imports as a number.
+    """
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
 @router.get(
     "/export",
     summary="Download any report as CSV",
@@ -863,7 +888,9 @@ def export_csv(
 
     buffer = io.StringIO()
     if rows:
-        records: List[Dict[str, Any]] = [r.model_dump() for r in rows]
+        records: List[Dict[str, Any]] = [
+            {key: _csv_safe(value) for key, value in r.model_dump().items()} for r in rows
+        ]
         writer = csv.DictWriter(buffer, fieldnames=list(records[0].keys()))
         writer.writeheader()
         writer.writerows(records)

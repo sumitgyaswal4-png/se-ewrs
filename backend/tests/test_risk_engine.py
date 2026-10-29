@@ -349,3 +349,21 @@ def test_configurable_thresholds_change_the_band_not_the_score():
     assert tight_result.risk_score == loose_result.risk_score
     assert tight_result.risk_category == "HIGH"
     assert loose_result.risk_category == "LOW"
+
+
+def test_settings_are_read_the_way_the_stored_procedure_reads_them(db):
+    """fn_setting_num rounds to 4 dp and CAST AS SIGNED rounds half-up.
+
+    Truncating instead would put a score of 30.7 in MEDIUM from the API
+    and LOW from the procedure once an admin sets a threshold of 30.5.
+    """
+    from app.models import SystemSetting
+
+    db.add_all([
+        SystemSetting(setting_key="risk.threshold.medium", setting_value="30.5", value_type="FLOAT"),
+        SystemSetting(setting_key="risk.weight.attendance", setting_value="0.33335", value_type="FLOAT"),
+    ])
+    db.commit()
+    config = RiskConfig.from_db(db)
+    assert config.threshold_medium == 31
+    assert config.weight_attendance == Decimal("0.3334")

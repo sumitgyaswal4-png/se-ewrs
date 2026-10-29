@@ -1,0 +1,20 @@
++------------+----------------+-----------+-----------------+------------------------+----------------+
+| student_id | student_name   | dept_code | at_risk_courses | courses                | avg_risk_score |
++------------+----------------+-----------+-----------------+------------------------+----------------+
+| MTH2024008 | Aisha Menon    | MATH      |               3 | CSE202, MTH201, MTH210 |          66.55 |
+| MTH2024001 | Raghav Trivedi | MATH      |               3 | CSE202, MTH201, MTH210 |          42.39 |
+| MTH2024019 | Veer Agarwal   | MATH      |               3 | CSE202, MTH201, MTH210 |          40.60 |
+| MTH2023024 | Pooja Shetty   | MATH      |               2 | MTH305, STA301         |          70.66 |
+| MTH2024023 | Omar Joshi     | MATH      |               2 | CSE202, MTH201         |          70.49 |
+| STA2023003 | Sara Ghosh     | STAT      |               2 | MTH305, STA301         |          69.44 |
+| STA2023004 | Veer Kapoor    | STAT      |               2 | MTH305, STA301         |          60.48 |
+| PHY2024002 | Arjun Agarwal  | PHY       |               2 | MTH201, MTH210         |          58.55 |
+| MTH2023020 | Raghav Sheikh  | MATH      |               2 | MTH305, STA301         |          42.50 |
+| MTH2024009 | Raghav Rao     | MATH      |               2 | CSE202, MTH210         |          40.78 |
+| CSE2023001 | Meera Kapoor   | CSE       |               2 | MTH305, STA301         |          40.78 |
+| MTH2024018 | Rohan Patel    | MATH      |               2 | MTH201, MTH210         |          36.24 |
+| CSE2024006 | Harsh Mehta    | CSE       |               2 | CSE202, MTH210         |          36.17 |
+| MTH2023002 | Juhi Ansari    | MATH      |               2 | MTH305, STA301         |          34.74 |
+| MTH2023015 | Rohan Bose     | MATH      |               2 | MTH305, STA301         |          34.38 |
+| MTH2024014 | Rohan Dutta    | MATH      |               2 | CSE202, MTH210         |          33.59 |
++------------+----------------+-----------+-----------------+------------------------+----------------+

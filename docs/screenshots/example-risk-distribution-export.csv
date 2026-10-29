@@ -1,5 +1,5 @@
 group_key,group_label,low_risk,medium_risk,high_risk,insufficient_data,total,avg_risk_score
 HIGH,High risk (60-100),0,0,9,0,9,69.91
-INSUFFICIENT_DATA,Needs more data,0,0,0,4,4,20.0
+INSUFFICIENT_DATA,Needs more data,0,0,0,4,4,
 LOW,Low risk (0-29),41,0,0,0,41,11.44
 MEDIUM,Medium risk (30-59),0,26,0,0,26,41.42

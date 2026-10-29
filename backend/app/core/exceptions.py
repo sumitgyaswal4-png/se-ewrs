@@ -57,6 +57,15 @@ class PermissionError_(AppError):
     error_code = "forbidden"
 
 
+class TooManyRequestsError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    error_code = "too_many_requests"
+
+    def __init__(self, detail: str, retry_after: int):
+        super().__init__(detail)
+        self.retry_after = retry_after
+
+
 def _envelope(status_code: int, detail: str, error_code: str) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -69,7 +78,11 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError):
-        return _envelope(exc.status_code, exc.detail, exc.error_code)
+        response = _envelope(exc.status_code, exc.detail, exc.error_code)
+        retry_after = getattr(exc, "retry_after", None)
+        if retry_after is not None:
+            response.headers["Retry-After"] = str(retry_after)
+        return response
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_error(_: Request, exc: StarletteHTTPException):

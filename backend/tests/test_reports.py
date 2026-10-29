@@ -9,6 +9,8 @@ import csv
 import io
 from datetime import date, datetime, timedelta
 
+import pytest
+
 from app.models import AssessmentResult, AttendanceRecord, LmsActivityLog
 
 
@@ -436,3 +438,88 @@ def test_empty_export_says_so_rather_than_returning_a_bare_file(client, as_admin
     )
     assert response.status_code == 200
     assert "no rows matched" in response.text
+
+
+def test_csv_export_cannot_smuggle_a_spreadsheet_formula(client, as_admin, seeded, db):
+    """Names are typed by staff; a cell opening with = runs in Excel."""
+    seeded.course.course_name = '=HYPERLINK("http://evil.example","open")'
+    seeded.course_b.course_name = "@SUM(1+1)*cmd|' /C calc'!A0"
+    seeded.dept.dept_code = "+MATH"
+    db.commit()
+
+    response = client.get("/api/reports/export?report=course-performance", headers=as_admin)
+    cells = [cell for row in csv.reader(io.StringIO(response.text)) for cell in row]
+    assert '\'=HYPERLINK("http://evil.example","open")' in cells
+    assert "'@SUM(1+1)*cmd|' /C calc'!A0" in cells
+    assert "'+MATH" in cells
+    assert not any(cell.startswith(("=", "+", "-", "@", "\t", "\r")) for cell in cells)
+
+    # Only the file is escaped: the JSON report still shows the real name.
+    names = {r["course_name"] for r in client.get("/api/reports/course-performance", headers=as_admin).json()}
+    assert '=HYPERLINK("http://evil.example","open")' in names
+
+
+@pytest.mark.parametrize("prefix", ["=", "+", "-", "@", "\t", "\r"])
+def test_every_formula_trigger_is_neutralised(prefix):
+    from app.api.reports import _csv_safe
+
+    assert _csv_safe(f"{prefix}1+2") == f"'{prefix}1+2"
+
+
+def test_safe_cells_and_numbers_are_left_alone():
+    from app.api.reports import _csv_safe
+
+    assert _csv_safe("Linear Algebra") == "Linear Algebra"
+    assert _csv_safe("a=b") == "a=b"
+    assert _csv_safe(-12.5) == -12.5
+    assert _csv_safe(None) is None
+
+
+def test_unscored_profiles_are_left_out_of_every_mean(client, as_admin, seeded, db):
+    """An INSUFFICIENT_DATA row keeps the partial score of its one component.
+
+    Averaging it in pulled the demo's MATH department from 28.51 to 27.88.
+    Here one MEDIUM enrolment scores 40 and an unscored one carries 20, so
+    every mean must read 40.0 (and would read 30.0 with the bug).
+    """
+    from app.models import Intervention, RiskAssessment
+
+    db.add_all([
+        RiskAssessment(enrollment_id=1, risk_score=40, risk_category="MEDIUM",
+                       data_completeness="COMPLETE"),
+        RiskAssessment(enrollment_id=2, risk_score=20, risk_category="INSUFFICIENT_DATA",
+                       data_completeness="INSUFFICIENT"),
+    ])
+    for enrollment_id in (1, 2):
+        db.add(Intervention(enrollment_id=enrollment_id, intervention_type="COUNSELING",
+                            contact_date=date.today(), assigned_advisor_id=4))
+    db.commit()
+
+    def get(path):
+        response = client.get(path, headers=as_admin)
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    department = next(r for r in get("/api/reports/department-risk") if r["dept_code"] == "MATH")
+    assert department["avg_risk_score"] == 40.0
+
+    by_semester = get("/api/reports/risk-distribution?group_by=semester")
+    assert [r["avg_risk_score"] for r in by_semester] == [40.0]
+
+    by_category = {r["group_key"]: r for r in get("/api/reports/risk-distribution?group_by=category")}
+    assert by_category["INSUFFICIENT_DATA"]["avg_risk_score"] is None
+
+    # No endpoint returns the per-course mean yet, so read the subquery itself.
+    from sqlalchemy import select
+
+    from app.services.queries import course_stats_sq
+
+    stats = course_stats_sq()
+    course_mean = db.execute(
+        select(stats.c.avg_risk_score).where(stats.c.course_pk == 1)
+    ).scalar_one()
+    assert float(course_mean) == 40.0
+
+    outcome = next(r for r in get("/api/reports/intervention-outcomes")
+                   if r["intervention_type"] == "COUNSELING")
+    assert outcome["avg_current_risk"] == 40.0

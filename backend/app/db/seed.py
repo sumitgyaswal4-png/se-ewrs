@@ -1414,15 +1414,18 @@ SELECT risk_category, COUNT(*) AS enrollments
 # CLI
 # ===========================================================================
 def _mask(url: str) -> str:
-    """Hide the password in a connection URL before printing it."""
-    if "@" not in url or "//" not in url:
-        return url
-    scheme, rest = url.split("//", 1)
-    creds, host = rest.split("@", 1)
-    if ":" in creds:
-        user = creds.split(":", 1)[0]
-        creds = f"{user}:***"
-    return f"{scheme}//{creds}@{host}"
+    """Hide the password in a connection URL before printing it.
+
+    Parsed rather than split on "@", which would print the tail of any
+    password containing one. Anything unparseable is withheld entirely.
+    """
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.exc import ArgumentError
+
+    try:
+        return make_url(url).render_as_string(hide_password=True)
+    except ArgumentError:
+        return "<unparseable database URL>"
 
 
 def main(argv: Optional[List[str]] = None) -> int:

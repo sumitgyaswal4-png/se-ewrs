@@ -2,8 +2,54 @@
 
 **A database management systems project report**
 
+Submitted by **Mohammad Adnan · Lucky Dhall · Raja · Sumit**
+
 Department of Mathematics
-Team: Mohammad Adnan · Lucky Dhall · Raja · Sumit
+
+Supervisor: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Institution: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Academic session: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Date of submission: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+---
+
+## Certificate
+
+This is to certify that the project report entitled *Student Engagement
+& Early Warning Risk System (SE-EWRS)*, submitted by Mohammad Adnan,
+Lucky Dhall, Raja and Sumit to the Department of Mathematics, is a
+record of work carried out by them under my supervision.
+
+Supervisor's signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Head of Department's signature: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ Date: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+---
+
+## Declaration
+
+We declare that this report and the system it describes are our own
+work, that every source we drew on is acknowledged in the references,
+and that the work has not been submitted for any other degree or
+examination.
+
+| Name | Signature | Date |
+|---|---|---|
+| Mohammad Adnan | | |
+| Lucky Dhall | | |
+| Raja | | |
+| Sumit | | |
+
+---
+
+## Acknowledgements
+
+We thank our supervisor, \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_, for guidance throughout the project,
+and the Department of Mathematics for the facilities used to build and
+test it.
 
 ---
 
@@ -32,11 +78,127 @@ generated column inside a unique key rather than by application logic.
 
 The system was verified against MySQL 8.0.46 rather than described. The
 risk model is implemented twice — once as a stored procedure and once in
-the application — and the two agree on all 1,440 field comparisons
+the application — and the two agree on all 1,600 field comparisons
 across the demonstration dataset. Stress testing at 170 times the
 demonstration scale exposed three access-path defects, each of which was
 fixed and proven to leave output byte-identical, giving improvements
 between ten-fold and one-hundred-and-thirty-two-fold.
+
+---
+
+## Contents
+
+- [Chapter 1 — Introduction](#chapter-1--introduction)
+  - [1.1 Background](#11-background)
+  - [1.2 Problem statement](#12-problem-statement)
+  - [1.3 Objectives](#13-objectives)
+  - [1.4 Scope and limitations](#14-scope-and-limitations)
+  - [1.5 Report organisation](#15-report-organisation)
+- [Chapter 2 — Existing systems and related work](#chapter-2--existing-systems-and-related-work)
+  - [2.1 Early-warning systems in education](#21-early-warning-systems-in-education)
+  - [2.2 What learning platforms already provide](#22-what-learning-platforms-already-provide)
+  - [2.3 Rule-based versus statistical models](#23-rule-based-versus-statistical-models)
+  - [2.4 The gap addressed](#24-the-gap-addressed)
+- [Chapter 3 — System analysis](#chapter-3--system-analysis)
+  - [3.1 The existing system and its shortcomings](#31-the-existing-system-and-its-shortcomings)
+  - [3.2 The proposed system](#32-the-proposed-system)
+  - [3.3 Feasibility](#33-feasibility)
+  - [3.4 Requirements](#34-requirements)
+  - [3.5 Hardware and software requirements](#35-hardware-and-software-requirements)
+- [Chapter 4 — System design](#chapter-4--system-design)
+  - [4.1 Architecture](#41-architecture)
+  - [4.2 Entity–relationship design](#42-entityrelationship-design)
+  - [4.3 Relational schema](#43-relational-schema)
+  - [4.4 Normalisation](#44-normalisation)
+  - [4.5 Constraints and keys](#45-constraints-and-keys)
+  - [4.6 Indexing strategy](#46-indexing-strategy)
+- [Chapter 5 — The risk model](#chapter-5--the-risk-model)
+  - [5.1 The formula](#51-the-formula)
+  - [5.2 The three components](#52-the-three-components)
+  - [5.3 Missing data, and why it is the part that matters](#53-missing-data-and-why-it-is-the-part-that-matters)
+  - [5.4 Bands and thresholds](#54-bands-and-thresholds)
+  - [5.5 Alerts](#55-alerts)
+  - [5.6 Keeping two implementations in step](#56-keeping-two-implementations-in-step)
+  - [5.7 Ethical considerations](#57-ethical-considerations)
+- [Chapter 6 — Implementation](#chapter-6--implementation)
+  - [6.1 Technology stack](#61-technology-stack)
+  - [6.2 Database implementation](#62-database-implementation)
+  - [6.3 Analytical queries](#63-analytical-queries)
+  - [6.4 Backend](#64-backend)
+  - [6.5 Frontend](#65-frontend)
+  - [6.6 Security](#66-security)
+- [Chapter 7 — Testing](#chapter-7--testing)
+  - [7.1 Strategy](#71-strategy)
+  - [7.2 Backend tests — 526](#72-backend-tests--526)
+  - [7.3 Frontend tests — 92](#73-frontend-tests--92)
+  - [7.4 Selected test cases](#74-selected-test-cases)
+  - [7.5 Coverage](#75-coverage)
+  - [7.6 Defects found during testing](#76-defects-found-during-testing)
+- [Chapter 8 — Results](#chapter-8--results)
+  - [8.1 The demonstration dataset](#81-the-demonstration-dataset)
+  - [8.2 Screenshots](#82-screenshots)
+  - [8.3 Observed risk distribution](#83-observed-risk-distribution)
+  - [8.4 Performance](#84-performance)
+  - [8.5 Concurrency](#85-concurrency)
+- [Chapter 9 — Conclusion and future work](#chapter-9--conclusion-and-future-work)
+  - [9.1 What was achieved](#91-what-was-achieved)
+  - [9.2 What was learned](#92-what-was-learned)
+  - [9.3 Limitations](#93-limitations)
+  - [9.4 Future work](#94-future-work)
+- [References](#references)
+- [Appendices](#appendices)
+
+## List of figures
+
+- Figure 4.1 — Three-tier architecture
+- Figure 4.2 — Entity–relationship diagram (sixteen tables)
+- Figure 4.3 — The engagement spine: every fact hangs off `enrollments`
+- Figure 8.1 — Login, with the demonstration accounts
+- Figure 8.2 — Administrator dashboard
+- Figure 8.3 — Students filtered to the high-risk band
+- Figure 8.4 — One student across all their courses
+- Figure 8.5 — Marking a whole session's attendance
+- Figure 8.6 — An out-of-range mark refused by the server
+- Figure 8.7 — Risk analysis table
+- Figure 8.8 — Risk detail for one enrolment
+- Figure 8.9 — Early-warning alert queue
+- Figure 8.10 — One alert with its status history
+- Figure 8.11 — Intervention tracking
+- Figure 8.12 — Reports, just after a CSV export
+- Figure 8.13 — The configurable risk model
+- Figure 8.14 — The application as a Teaching Assistant
+- Figure 8.15 — The application as a Department Chair
+- Figure 8.16 — `EXPLAIN SELECT * FROM student_performance_view WHERE enrollment_id = 1` at 170× scale
+
+## List of tables
+
+- Table 3.1 — Shortcomings of the existing process
+- Table 3.2 — What each role must be able to do
+- Table 3.3 — Requirements and how each is met
+- Table 3.4 — Hardware and software requirements
+- Table 4.1 — The sixteen tables
+- Table 4.2 — Normal forms and how each is satisfied
+- Table 4.3 — Constraints and what each prevents
+- Table 5.1 — Engagement penalties
+- Table 5.2 — Missing marks treated as zero versus dropped
+- Table 5.3 — Data completeness and banding
+- Table 5.4 — Risk bands and thresholds
+- Table 5.5 — How alerts respond to each situation
+- Table 6.1 — Technology stack
+- Table 6.2 — Views and the concepts they demonstrate
+- Table 6.3 — Selected analytical queries
+- Table 6.4 — Security measures
+- Table 7.1 — Backend test files
+- Table 7.2 — Selected test cases
+- Table 7.3 — Coverage by module
+- Table 8.1 — Observed risk distribution
+- Table 8.2 — Risk recalculation before and after the procedure fix
+- Table 8.3 — Single-entity endpoints before and after
+- Table 8.4 — What the paginated lists filter on versus what the aggregates supply
+- Table 8.5 — Paginated lists before and after
+- Table 8.6 — Evidence that each optimisation left output unchanged
+- Table 8.7 — Concurrency tests
+- Table 9.1 — Future work
 
 ---
 
@@ -120,7 +282,9 @@ Chapter 2 reviews existing approaches. Chapter 3 analyses the
 requirements. Chapter 4 is the database design and is the core of the
 report. Chapter 5 specifies the risk model. Chapter 6 covers
 implementation, Chapter 7 testing, Chapter 8 results — including the
-performance work — and Chapter 9 concludes.
+performance work — and Chapter 9 concludes. Appendices A–E reproduce
+the full SQL, every analytical query with its output, the API endpoint
+table and the central source listings.
 
 ---
 
@@ -128,14 +292,23 @@ performance work — and Chapter 9 concludes.
 
 ### 2.1 Early-warning systems in education
 
-Academic early-warning systems share a common shape: gather indicators
+Early-warning systems are one of the most established applications of
+learning analytics [1]. They share a common shape: gather indicators
 that are observable early, combine them into a signal, and route that
 signal to somebody who can act. They differ in which indicators they
 use and in how the combination is done.
 
 The indicators that recur across the literature are attendance,
 submission behaviour (particularly lateness and non-submission), and
-activity within the learning platform. These are chosen less because
+activity within the learning platform. Attendance and behaviour are the
+school-level indicators Balfanz et al. used to identify students
+leaving the path to graduation [2]; Macfadyen and Dawson showed that
+platform activity — forum posts, messages, completed assessments —
+predicted final grades well enough to build an early warning on [3].
+Purdue's Course Signals combined grades, platform effort and prior
+academic history into a traffic-light signal seen by students and staff
+[4], and the Open Academic Analytics Initiative built an open-source
+early-alert model on the same kinds of data [5]. These are chosen less because
 they are the strongest predictors than because they are available early.
 A mid-term mark is a better predictor of a final mark than a login
 count, but it arrives too late to be an early warning.
@@ -167,7 +340,9 @@ A rule-based model was chosen for three reasons.
    formula, the weights, the three component risks, the observed figures
    behind them and the contributing factors in words. A gradient-boosted
    model can be made explicable, but not for free, and not to a reader
-   without training.
+   without training. For decisions about people, Rudin argues for
+   models that are interpretable by construction rather than explained
+   after the fact [6].
 2. **No training data.** A supervised model needs labelled outcomes from
    previous cohorts. This project had none, and inventing them would
    have produced a model that validated against its own fiction.
@@ -204,6 +379,8 @@ visible only inside the platform, usually only to the course owner.
 The shortcomings follow from the distribution rather than from any one
 tool being bad:
 
+**Table 3.1 — Shortcomings of the existing process**
+
 | Shortcoming | Consequence |
 |---|---|
 | Data held in three places, joined by nobody | No single view of a student's engagement |
@@ -224,9 +401,9 @@ Every significant change is written to an audit log.
 
 **Technical.** The components are standard and well understood: MySQL 8,
 a Python web framework, a JavaScript single-page application. The
-heaviest requirement is MySQL 8.0.16 or later, needed for enforced
-`CHECK` constraints and for the stored generated column that makes the
-duplicate-alert guard work. This was verified on 8.0.46.
+heaviest requirement is MySQL 8.0.16 or later, the first release that
+enforces `CHECK` constraints [7]; CTEs and window functions also need
+8.0. This was verified on 8.0.46.
 
 **Operational.** The system does not replace any existing process; it
 reads data that is already collected and presents it differently. Staff
@@ -248,15 +425,19 @@ judgement. The demonstration data contains no real student records.
 
 **Functional requirements, grouped by role**
 
+**Table 3.2 — What each role must be able to do**
+
 | Role | What they must be able to do |
 |---|---|
 | Administrator | Manage staff accounts, students, courses, enrolments and system settings; see everything |
-| Instructor | Mark attendance, create assessments, enter marks, view risk for their courses |
+| Instructor | Mark attendance, create assessments, enter marks, view and recalculate risk |
 | Teaching Assistant | Mark attendance and enter marks; read student and risk data; no alert handling |
 | Academic Advisor | Work the alert queue, record interventions, read student and risk data |
-| Department Chair | Read everything departmental, including reports; change nothing |
+| Department Chair | Read everything, including reports; change nothing |
 
 **Non-functional requirements**
+
+**Table 3.3 — Requirements and how each is met**
 
 | Area | Requirement | How it is met |
 |---|---|---|
@@ -269,6 +450,8 @@ judgement. The demonstration data contains no real student records.
 | Auditability | Significant changes attributable | `audit_logs`, written by application and triggers |
 
 ### 3.5 Hardware and software requirements
+
+**Table 3.4 — Hardware and software requirements**
 
 | | Requirement |
 |---|---|
@@ -298,6 +481,8 @@ Three tiers, with a strict rule about where logic lives.
    MySQL 8                           (views, procedures, triggers, constraints)
 ```
 
+**Figure 4.1 — Three-tier architecture**
+
 The rule is that **the database owns the invariants**. The application
 validates input so that users get good error messages, but it is never
 the only thing standing between bad data and the tables. Marks above the
@@ -312,10 +497,19 @@ survive all three.
 
 ### 4.2 Entity–relationship design
 
-The full Mermaid ER diagram is in `docs/er_diagram.md` §1 and should be
-rendered as the chapter's first figure. The simplified "engagement
-spine" in §2 is worth reproducing alongside it, because it shows the one
-structural decision that shapes everything else.
+Figure 4.2 is the full entity–relationship diagram [8], rendered from
+the Mermaid source in `docs/er_diagram.md` §1. Figure 4.3 is the
+simplified "engagement spine" from §2 of the same file, reproduced
+because it shows the one structural decision that shapes everything
+else.
+
+![Full entity–relationship diagram](figures/er-diagram.png)
+
+**Figure 4.2 — Entity–relationship diagram (sixteen tables)**
+
+![The engagement spine](figures/engagement-spine.png)
+
+**Figure 4.3 — The engagement spine: every fact hangs off `enrollments`**
 
 **The engagement spine.** Every engagement fact — attendance, activity,
 results, risk, alerts, interventions — references `enrollment_id`. None
@@ -333,6 +527,8 @@ through it means:
 ### 4.3 Relational schema
 
 Sixteen tables.
+
+**Table 4.1 — The sixteen tables**
 
 | # | Table | Purpose |
 |---|---|---|
@@ -359,7 +555,10 @@ Verified against `information_schema` on the loaded database: 16 tables,
 
 ### 4.4 Normalisation
 
-The schema is in **third normal form**.
+The schema is in **third normal form**, in the sense of Codd's
+relational model [9] as presented in the standard texts [10].
+
+**Table 4.2 — Normal forms and how each is satisfied**
 
 | Form | How it is satisfied |
 |---|---|
@@ -400,6 +599,8 @@ deleting an alert removes its status history.
 
 Composite unique keys encode the business rules:
 
+**Table 4.3 — Constraints and what each prevents**
+
 | Constraint | What it prevents |
 |---|---|
 | `uq_enrollment_student_course` | Enrolling the same student twice on one course |
@@ -425,8 +626,8 @@ UNIQUE KEY uq_alert_one_active_per_enrollment (enrollment_id, active_flag)
 
 Every open alert has `active_flag = 1`, so two of them for one enrolment
 collide on the unique key. A resolved alert has `active_flag = NULL`,
-and SQL's unique keys permit repeated NULLs, so resolved history is
-unlimited.
+and a MySQL unique index permits repeated NULLs [7], so resolved
+history is unlimited.
 
 The duplicate-alert requirement is therefore satisfied by the storage
 engine rather than by application logic. No amount of concurrency, no
@@ -504,6 +705,8 @@ most common way a system like this becomes unfair.
 engagement = clamp(100 − (recency + frequency + missing + late), 0, 100)
 ```
 
+**Table 5.1 — Engagement penalties**
+
 | Penalty | Rule |
 |---|---|
 | **recency** — days since the last platform event | never active → 50 · ≤3 → 0 · ≤7 → 10 · ≤14 → 20 · ≤30 → 35 · >30 → 50 |
@@ -527,6 +730,8 @@ The consequence is best shown by example. Consider a student four weeks
 into a term with 80% attendance, flawless engagement, and no graded work
 yet — a perfectly ordinary and perfectly fine student.
 
+**Table 5.2 — Missing marks treated as zero versus dropped**
+
 | | academic treated as zero (**wrong**) | academic component dropped (**this system**) |
 |---|---|---|
 | attendance risk 20 × 0.35 | 7.00 | 7.00 |
@@ -540,7 +745,7 @@ risk purely for being early in the term, and would do so for most of the
 cohort in week four — which is exactly when staff would learn to ignore
 the system.
 
-**Completeness and banding**
+**Table 5.3 — Data completeness and banding**
 
 | Components available | `data_completeness` | `risk_category` |
 |---|---|---|
@@ -555,6 +760,8 @@ dataset deliberately contains four such enrolments so that the behaviour
 is visible rather than theoretical.
 
 ### 5.4 Bands and thresholds
+
+**Table 5.4 — Risk bands and thresholds**
 
 | Band | Score | Setting |
 |---|---|---|
@@ -575,6 +782,8 @@ produced it.
 
 An alert is raised when the band is `MEDIUM` or `HIGH` **and** the score
 is at least `alert.min_score` (default 30).
+
+**Table 5.5 — How alerts respond to each situation**
 
 | Situation | What happens |
 |---|---|
@@ -627,14 +836,28 @@ Three mechanisms prevent it.
 
 The agreement is tested rather than assumed. Every enrolment in the
 demonstration database is scored by the stored procedure during seeding
-and then recomputed by the Python engine, and all eighteen stored fields
-are compared: **80 enrolments × 18 fields = 1,440 comparisons, zero
-mismatches.** This check was re-run after every subsequent change to the
-query layer.
+and then recomputed by the Python engine, and all twenty stored fields
+are compared: **80 enrolments × 20 fields = 1,600 comparisons, zero
+mismatches.** `backend/scripts/check_risk_parity.py` makes the
+comparison and can be re-run against any MySQL database.
+
+The check also found a divergence that the demonstration settings hid.
+The procedure reads every setting as `DECIMAL(10,4)` and converts
+integer settings with `CAST(... AS SIGNED)`, which rounds; the engine
+truncated. With a medium threshold of 24.5 and weights of 0.33335 and
+0.41665, three enrolments disagreed — one placed LOW by SQL and MEDIUM
+by Python. The engine now converts settings exactly as the procedure
+does, the same run gives zero mismatches, and a unit test pins the
+conversion.
 
 ### 5.7 Ethical considerations
 
-A system that scores students needs its limits written down.
+A system that scores students needs its limits written down. Slade
+and Prinsloo set out the ethical issues learning analytics raises —
+transparency, informed consent, the student as an agent rather than a
+passive subject of data, and the fact that a student's identity and
+performance change over time, so that no score is final [11]. The
+design responds to them as follows.
 
 - **The score is an indicator, not a judgement.** It is stated in the
   sidebar of every page and in the footer of the risk detail page.
@@ -661,21 +884,25 @@ auditing fiction would prove nothing.
 
 ### 6.1 Technology stack
 
+**Table 6.1 — Technology stack**
+
 | Layer | Choice | Why |
 |---|---|---|
-| Database | MySQL 8.0.16+ | Enforced `CHECK` constraints, stored generated columns, CTEs and window functions — all four are used, and none exists in MySQL 5.7 |
-| Backend | FastAPI (Python) | Request validation from type hints, dependency injection for the permission layer, and an OpenAPI document generated from the code rather than maintained beside it |
-| ORM | SQLAlchemy 2.0 | Core expressions for the aggregate queries, ORM for entities; parameterised by construction |
+| Database | MySQL 8.0.16+ | Enforced `CHECK` constraints, CTEs and window functions [7] — all three are used, and none exists in MySQL 5.7. Stored generated columns are used too |
+| Backend | FastAPI (Python) [12] | Request validation from type hints, dependency injection for the permission layer, and an OpenAPI document generated from the code rather than maintained beside it |
+| ORM | SQLAlchemy 2.0 [13] | Core expressions for the aggregate queries, ORM for entities; parameterised by construction |
 | Validation | Pydantic v2 | One schema serves validation, serialisation and documentation |
-| Frontend | React 18 + Vite | Component model suits a form-and-table application; Vite keeps the dev loop fast |
+| Frontend | React 18 + Vite [14] | Component model suits a form-and-table application; Vite keeps the dev loop fast |
 | Styling | Tailwind CSS | Consistent spacing and colour without a separate stylesheet to drift |
 | Charts | Recharts | Declarative, composes with React, no imperative canvas code |
-| Hashing | Argon2id | Current OWASP recommendation for password storage |
+| Hashing | Argon2id | Current OWASP recommendation for password storage [15] |
 
 ### 6.2 Database implementation
 
 **Views — twelve.** Four are building blocks that roll up one fact table
 per enrolment; eight are composite views built on them.
+
+**Table 6.2 — Views and the concepts they demonstrate**
 
 | View | Concepts demonstrated |
 |---|---|
@@ -764,14 +991,17 @@ two can never disagree about what happened.
 ### 6.3 Analytical queries
 
 `database/analytics_queries.sql` holds fifteen documented read-only
-queries. Six are worth reproducing in the report with their output:
+queries; all fifteen are reproduced with their output in Appendix C.
+Six show the SQL concepts worth discussing:
+
+**Table 6.3 — Selected analytical queries**
 
 | Query | SQL concept |
 |---|---|
 | Q1 | Scalar subquery in the select list |
-| Q5 | **Correlated subquery** — students above their own course's mean |
-| Q6 | **CTE + `SUM() OVER ()`** — running share of the cohort |
-| Q11 | **`LAG()`** — month-on-month change per course |
+| Q5 | **Correlated subquery** — students below their own course's mean |
+| Q6 | **CTE + `SUM() OVER ()`** — each department's share of all high-risk enrolments |
+| Q11 | **`LAG()`** — each enrolment's change since its previous calculation |
 | Q13 | `GROUP BY … HAVING` with **`GROUP_CONCAT`** |
 | Q15 | **`EXPLAIN`** demonstration of index usage |
 
@@ -820,14 +1050,19 @@ figures available as a table.
 
 ### 6.6 Security
 
+**Table 6.4 — Security measures**
+
 | Measure | Implementation |
 |---|---|
 | Password storage | Argon2id, salted per password, rehashed on sign-in if parameters change |
 | Credentials in transit | Exchanged once for a JWT with an expiry |
+| Account enumeration | Unknown email and wrong password return the same 401 and cost the same Argon2 verification, so timing does not reveal which accounts exist |
+| Password guessing | After 5 failed sign-ins for one email, or 20 from one address, within 15 minutes, further attempts get a 429 before any database or Argon2 work |
+| Spreadsheet formulas in exports | A CSV cell starting with `=`, `+`, `-`, `@`, tab or CR is prefixed with `'`, so a name typed as a formula opens as text |
 | Authorisation | Named permissions checked server-side on every endpoint |
 | SQL injection | All access through SQLAlchemy with bound parameters; even sortable column names are checked against an allowlist rather than interpolated |
 | Input validation | Pydantic on every body and query parameter, with `CHECK` constraints behind it |
-| Secrets | Environment variables only; `.env` is git-ignored and `.env.example` ships placeholders |
+| Secrets | Environment variables only; `.env` is git-ignored and `.env.example` ships placeholders. No key is built in: the server will not start with a missing, short or placeholder `SECRET_KEY` |
 | Audit | `audit_logs`, written by the application and by seven triggers |
 | Error messages | Centralised envelope; no stack traces, no credential hints |
 
@@ -859,26 +1094,29 @@ their unit tests while being visibly broken, and one piece of
 documentation drifted without anything failing. Tests that only exercise
 the layer they were written for will miss both.
 
-### 7.2 Backend tests — 483
+### 7.2 Backend tests — 526
+
+**Table 7.1 — Backend test files**
 
 | File | Tests | What it verifies |
 |---|---|---|
-| `test_auth.py` | 19 | Login, token expiry, password change, user management |
+| `test_auth.py` | 31 | Login, token expiry, password change, user management, failed-login throttling |
 | `test_rbac.py` | 96 | The full permission matrix — every role against every guarded endpoint |
 | `test_students.py` | 21 | CRUD, search, filters, soft delete, the profile view |
 | `test_courses.py` | 17 | Catalogue, instructors, roster |
 | `test_enrollments.py` | 16 | Enrolment rules, duplicate prevention, bulk enrolment |
 | `test_attendance.py` | 16 | Marking, idempotent re-marking, excused handling |
 | `test_assessments.py` | 26 | Assessments, marks entry, validation, trends |
-| `test_risk_engine.py` | 47 | The formula, the bands, missing-data re-normalisation |
+| `test_risk_engine.py` | 48 | The formula, the bands, missing-data re-normalisation |
 | `test_risk_api.py` | 20 | Recalculation, the table, the explanation payload |
 | `test_alerts.py` | 30 | Generation, **duplicate prevention at the constraint**, transitions |
 | `test_interventions.py` | 22 | Recording, alert linkage, date validation |
-| `test_reports.py` | 27 | Report figures against hand-computed values, CSV export |
-| `test_system.py` | 23 | Health, settings, audit trail, error envelopes, an injection payload |
+| `test_reports.py` | 36 | Report figures against hand-computed values, CSV export and its formula escaping, unscored profiles kept out of every mean |
+| `test_system.py` | 36 | Health, settings, audit trail, error envelopes, an injection payload, the startup `SECRET_KEY` checks, database URL encoding |
 | `test_seed.py` | 27 | Dataset properties, risk spread, reseed idempotency |
 | `test_api_docs.py` | 76 | Every endpoint documented; every documented permission matches enforcement |
-| **Total** | **483** | |
+| `test_report_docs.py` | 8 | This report: appendices match their sources; figures, tables, citations and contents agree |
+| **Total** | **526** | |
 
 `test_api_docs.py` deserves a note. It reads the routes off the
 application's own router table and the tables out of the API reference,
@@ -901,6 +1139,8 @@ helper and the trend chart.
 
 ### 7.4 Selected test cases
 
+**Table 7.2 — Selected test cases**
+
 | ID | Description | Input | Expected | Actual | Result |
 |---|---|---|---|---|---|
 | T1 | Formula produces the documented score | att 70%, acad 60%, eng 100 | 26.50, LOW | 26.50, LOW | Pass |
@@ -912,7 +1152,7 @@ helper and the trend chart.
 | T7 | A chair receives 403 on writes | chair → every write endpoint | 403 on all | 403 on all | Pass |
 | T8 | Excused absence does not depress attendance | 10 sessions, 2 excused, 8 attended | 100% | 100% | Pass |
 | T9 | A stored 0% survives to the profile | stored 0%, live 100% | 0% shown | 0% shown | Pass |
-| T10 | SQL and Python agree | all 80 enrolments × 18 fields | zero mismatches | zero mismatches | Pass |
+| T10 | SQL and Python agree | all 80 enrolments × 20 fields | zero mismatches | zero mismatches | Pass |
 
 T9 is a regression test for a real defect found during this project, and
 is described in §7.6.
@@ -923,6 +1163,8 @@ is described in §7.6.
 
 What remains uncovered is concentrated in four modules, none of them the
 model:
+
+**Table 7.3 — Coverage by module**
 
 | Module | Covered | What is missed |
 |---|---|---|
@@ -987,14 +1229,72 @@ three separate occasions.
 
 ### 8.2 Screenshots
 
-Fifteen screenshots are in `docs/screenshots/`, with captions in the
-`README.md` beside them written to be lifted into this chapter as the
-figure list. All were captured from the running application against
-MySQL, so the figures agree across images.
+Figures 8.1–8.15 were captured from the running application against
+MySQL, so the numbers agree across images. Longer captions for each are
+in `docs/screenshots/README.md`.
 
+![Login, with the demonstration accounts](screenshots/01-login.png)
+
+**Figure 8.1 — Login, with the demonstration accounts**
+
+![Administrator dashboard](screenshots/02-dashboard-admin.png)
+
+**Figure 8.2 — Administrator dashboard**
+
+![Students filtered to the high-risk band](screenshots/03-students-filtered-high-risk.png)
+
+**Figure 8.3 — Students filtered to the high-risk band**
+
+![One student across all their courses](screenshots/04-student-profile.png)
+
+**Figure 8.4 — One student across all their courses**
+
+![Marking a whole session's attendance](screenshots/05-attendance-marking.png)
+
+**Figure 8.5 — Marking a whole session's attendance**
+
+![An out-of-range mark refused by the server](screenshots/06-marks-validation-rejected.png)
+
+**Figure 8.6 — An out-of-range mark refused by the server**
+
+![Risk analysis table](screenshots/07-risk-analysis-table.png)
+
+**Figure 8.7 — Risk analysis table**
+
+![Risk detail for one enrolment](screenshots/08-risk-detail.png)
+
+**Figure 8.8 — Risk detail for one enrolment**
+
+![Early-warning alert queue](screenshots/09-alerts-queue.png)
+
+**Figure 8.9 — Early-warning alert queue**
+
+![One alert with its status history](screenshots/10-alert-detail-history.png)
+
+**Figure 8.10 — One alert with its status history**
+
+![Intervention tracking](screenshots/11-interventions.png)
+
+**Figure 8.11 — Intervention tracking**
+
+![Reports, just after a CSV export](screenshots/12-reports-csv-export.png)
+
+**Figure 8.12 — Reports, just after a CSV export**
+
+![The configurable risk model](screenshots/13-settings-risk-weights.png)
+
+**Figure 8.13 — The configurable risk model**
+
+![The application as a Teaching Assistant](screenshots/14-rbac-teaching-assistant.png)
+
+**Figure 8.14 — The application as a Teaching Assistant**
+
+![The application as a Department Chair](screenshots/15-rbac-department-chair.png)
+
+**Figure 8.15 — The application as a Department Chair**
 Two deserve more than a caption.
 
-**Figure 6 — marks validation.** A mark of 999 entered against an
+**Figure 8.6 — marks validation.** A mark of 999 entered against an
 assessment worth 10. The HTML `max` attribute does not stop it — that
 attribute only constrains the spinner — so the request reaches the API,
 which refuses it with *"Marks obtained (999.0) cannot exceed the maximum
@@ -1003,7 +1303,7 @@ the screenshot shows the one that actually matters. The same image also
 shows a **Missing** badge, demonstrating that ungraded work is recorded
 as missing rather than scored zero.
 
-**Figures 14 and 15 — access control.** The same build and the same
+**Figures 8.14 and 8.15 — access control.** The same build and the same
 URLs seen by a Teaching Assistant and by a Department Chair: different
 navigation, different actions. The important point for the report is
 that hiding a control is only the visible half — every endpoint behind
@@ -1011,6 +1311,8 @@ it re-checks the permission server-side, which `test_rbac.py` verifies
 with 96 tests.
 
 ### 8.3 Observed risk distribution
+
+**Table 8.1 — Observed risk distribution**
 
 | Band | Enrolments | Share |
 |---|---|---|
@@ -1049,21 +1351,58 @@ SELECT ... FROM student_performance_view WHERE enrollment_id = ?
 sub-views in full and then filters**, so every call aggregated roughly
 450,000 rows in order to fetch one.
 
+**Table 8.2 — Risk recalculation before and after the procedure fix**
+
 | | before | after |
 |---|---|---|
 | one enrolment | 4,406 ms | **33.5 ms** |
 | all 6,000 | ~7 hours (projected) | **82 seconds** |
 
 The fix reads the base tables with an `enrollment_id` predicate so the
-per-enrolment indexes are used. The `EXPLAIN` output containing
-`<derived3>` is the single most instructive figure in this chapter and
-should be reproduced.
+per-enrolment indexes are used. Figure 8.16 is the plan of the old read,
+captured from the 170× benchmark database built by
+`database/scale_test.sh`.
+
+```text
++----+-------------+------------+-------+--------------------------+------+-------------+
+| id | select_type | table      | type  | key                      | rows | Extra       |
++----+-------------+------------+-------+--------------------------+------+-------------+
+| 1  | PRIMARY     | e          | const | PRIMARY                  | 1    | NULL        |
+| 1  | PRIMARY     | s          | const | PRIMARY                  | 1    | NULL        |
+| 1  | PRIMARY     | d          | const | PRIMARY                  | 1    | NULL        |
+| 1  | PRIMARY     | c          | const | PRIMARY                  | 1    | NULL        |
+| 1  | PRIMARY     | <derived3> | ref   | <auto_key0>              | 10   | NULL        |
+| 1  | PRIMARY     | <derived4> | ref   | <auto_key0>              | 10   | NULL        |
+| 1  | PRIMARY     | <derived5> | ref   | <auto_key0>              | 10   | NULL        |
+| 5  | DERIVED     | e          | index | PRIMARY                  | 6000 | Using index |
+| 5  | DERIVED     | l          | ref   | ix_lms_enrollment_time   | 43   | NULL        |
+| 4  | DERIVED     | e          | index | PRIMARY                  | 6000 | Using index |
+| 4  | DERIVED     | r          | ref   | ix_results_enrollment    | 5    | NULL        |
+| 3  | DERIVED     | e          | index | PRIMARY                  | 6000 | Using index |
+| 3  | DERIVED     | a          | ref   | ix_attendance_enrollment | 23   | NULL        |
++----+-------------+------------+-------+--------------------------+------+-------------+
+```
+
+**Figure 8.16 — `EXPLAIN SELECT * FROM student_performance_view WHERE enrollment_id = 1` at 170× scale**
+
+Columns `partitions`, `possible_keys`, `key_len`, `ref` and `filtered`
+are omitted for width; the full output is in
+`docs/analytics_output/slow_read_explain.txt`. Each `DERIVED` block
+begins with an index scan of all 6,000 enrolments: the aggregate is
+built for every enrolment, then the outer query keeps one. `EXPLAIN
+ANALYZE` on the same statement reported 4,555 ms for the single row
+returned, and inner lookups of 24, 5 and 45 rows per enrolment over
+6,000 loops — 144,000 attendance, 30,000 result and 270,000 activity
+rows, 444,000 in all. The fixed procedure took 20–38 ms per enrolment
+on the same database, and a full recalculation 81 seconds.
 
 **The same bug in the application.** The identical mistake existed in
 Python, and cost a *page* rather than a batch job: endpoints that wanted
 one enrolment filtered the *result* of a whole-table aggregate instead
 of restricting the aggregate. Opening one student's profile took 3.4
 seconds.
+
+**Table 8.3 — Single-entity endpoints before and after**
 
 | Endpoint | Before | After | |
 |---|---|---|---|
@@ -1083,6 +1422,8 @@ known until the query has run.
 
 It does not need to. Reading what each endpoint actually *selects* by:
 
+**Table 8.4 — What the paginated lists filter on versus what the aggregates supply**
+
 | | filters, sorts and counts on | the heavy aggregates supply |
 |---|---|---|
 | `GET /api/risk-assessments` | enrolment, student, course, latest risk, open alert | three display columns |
@@ -1090,6 +1431,8 @@ It does not need to. Reading what each endpoint actually *selects* by:
 
 Neither list is *chosen* by the expensive aggregates. Each now selects
 its page without them and computes them for the twenty rows returned.
+
+**Table 8.5 — Paginated lists before and after**
 
 | Endpoint | Before | After | |
 |---|---|---|---|
@@ -1101,6 +1444,8 @@ from tuning anything.
 
 **Proving the fixes changed nothing but speed.** An optimisation that
 alters output is a defect. Each was checked rather than argued:
+
+**Table 8.6 — Evidence that each optimisation left output unchanged**
 
 | Fix | Evidence |
 |---|---|
@@ -1135,6 +1480,8 @@ seven hours before the first fix.
 
 The duplicate-alert guard was tested under real contention: threads
 released from a barrier so they fire together against MySQL.
+
+**Table 8.7 — Concurrency tests**
 
 | Race | Result |
 |---|---|
@@ -1216,11 +1563,27 @@ count one short. Each was caught by checking rather than by re-reading.
   calibrated.
 - **No incremental recalculation.** A run re-scores every active
   enrolment rather than only those whose underlying data changed. At
-  6,000 enrolments this is 70 seconds, which is acceptable for a nightly
+  6,000 enrolments this is about 80 seconds, which is acceptable for a nightly
   job and wasteful for a continuous one.
 - **No fairness audit.** See §5.7.
+- **Permissions are per role, not per course.** An instructor may enter
+  marks on any course, not only the ones they teach, and a chair reads
+  every department. `course_instructors` records who teaches what, but
+  no endpoint consults it. Scoping by course and department is the
+  first change a real deployment would need.
+- **Sessions are not revoked on a password change.** A token already
+  issued stays valid until it expires (eight hours). Deactivating an
+  account does end it immediately.
+- **The token is kept in `localStorage`**, so a cross-site scripting
+  flaw anywhere in the frontend could read it. No such flaw is known;
+  the frontend never injects raw HTML.
+- **Failed sign-ins are counted in one process's memory.** That suits
+  the single uvicorn worker used here; several workers would each keep
+  their own count and need a shared store such as Redis.
 
 ### 9.4 Future work
+
+**Table 9.1 — Future work**
 
 | Direction | Why it matters |
 |---|---|
@@ -1237,3 +1600,52 @@ to staff is surveillance; the same score shown to the student, with the
 same explanation, is feedback. The design supports it — the detail page
 is already built to be read by somebody who may disagree with it — but
 making that change responsibly needs the fairness audit first.
+
+---
+
+## References
+
+[1] G. Siemens and P. Long, "Penetrating the fog: Analytics in learning and education," *EDUCAUSE Review*, vol. 46, no. 5, pp. 30–40, 2011.
+
+[2] R. Balfanz, L. Herzog, and D. J. Mac Iver, "Preventing student disengagement and keeping students on the graduation path in urban middle-grades schools: Early identification and effective interventions," *Educational Psychologist*, vol. 42, no. 4, pp. 223–235, 2007.
+
+[3] L. P. Macfadyen and S. Dawson, "Mining LMS data to develop an 'early warning system' for educators: A proof of concept," *Computers & Education*, vol. 54, no. 2, pp. 588–599, 2010.
+
+[4] K. E. Arnold and M. D. Pistilli, "Course Signals at Purdue: Using learning analytics to increase student success," in *Proc. 2nd Int. Conf. Learning Analytics and Knowledge (LAK '12)*, Vancouver, BC, Canada, 2012, pp. 267–270.
+
+[5] S. M. Jayaprakash, E. W. Moody, E. J. M. Lauría, J. R. Regan, and J. D. Baron, "Early alert of academically at-risk students: An open source analytics initiative," *Journal of Learning Analytics*, vol. 1, no. 1, pp. 6–47, 2014.
+
+[6] C. Rudin, "Stop explaining black box machine learning models for high stakes decisions and use interpretable models instead," *Nature Machine Intelligence*, vol. 1, no. 5, pp. 206–215, 2019.
+
+[7] Oracle Corporation, *MySQL 8.0 Reference Manual*. [Online]. Available: https://dev.mysql.com/doc/refman/8.0/en/
+
+[8] P. P.-S. Chen, "The entity-relationship model — Toward a unified view of data," *ACM Transactions on Database Systems*, vol. 1, no. 1, pp. 9–36, 1976.
+
+[9] E. F. Codd, "A relational model of data for large shared data banks," *Communications of the ACM*, vol. 13, no. 6, pp. 377–387, 1970.
+
+[10] A. Silberschatz, H. F. Korth, and S. Sudarshan, *Database System Concepts*, 7th ed. New York, NY, USA: McGraw-Hill, 2019.
+
+[11] S. Slade and P. Prinsloo, "Learning analytics: Ethical issues and dilemmas," *American Behavioral Scientist*, vol. 57, no. 10, pp. 1510–1529, 2013.
+
+[12] S. Ramírez, *FastAPI documentation*. [Online]. Available: https://fastapi.tiangolo.com/
+
+[13] *SQLAlchemy 2.0 documentation*. [Online]. Available: https://docs.sqlalchemy.org/en/20/
+
+[14] *React documentation*. [Online]. Available: https://react.dev/
+
+[15] OWASP Foundation, "Password Storage Cheat Sheet," *OWASP Cheat Sheet Series*. [Online]. Available: https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html
+
+---
+
+## Appendices
+
+The appendices are in [`report_appendices.md`](report_appendices.md),
+generated from the source files by `docs/build_appendices.py` so they
+cannot drift from the code they reproduce.
+
+- **Appendix A** — Schema (`database/schema.sql`)
+- **Appendix B** — Views, procedures and triggers
+- **Appendix C** — The fifteen analytical queries, each with its output
+- **Appendix D** — API endpoints (`docs/api_documentation.md` §4)
+- **Appendix E** — Selected source listings: the Python risk model,
+  alert reconciliation and the permission check

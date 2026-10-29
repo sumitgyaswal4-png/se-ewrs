@@ -72,6 +72,21 @@ def _pct(numerator, denominator):
     return func.round(100.0 * numerator / func.nullif(denominator, 0), 2)
 
 
+#: The categories a score was actually banded into.
+SCORED_CATEGORIES = ("LOW", "MEDIUM", "HIGH")
+
+
+def scored_risk(risk_score, risk_category):
+    """``risk_score`` for a banded row, NULL for ``INSUFFICIENT_DATA``.
+
+    An unscored profile still stores the partial score of its one
+    available component. Aggregate this instead of ``risk_score`` so AVG
+    and MAX skip it, as they skip any NULL, rather than counting a
+    one-component figure as an assessment.
+    """
+    return case((risk_category.in_(SCORED_CATEGORIES), risk_score))
+
+
 # ---------------------------------------------------------------------------
 # Per-enrolment roll-ups
 # ---------------------------------------------------------------------------
@@ -403,12 +418,13 @@ def student_risk_counts_sq() -> Subquery:
     it had been assessed.
     """
     lr, oa = latest_risk_sq(), open_alert_sq()
-    banded = lr.c.risk_category.in_(("LOW", "MEDIUM", "HIGH"))
     return (
         select(
             Enrollment.student_pk.label("student_pk"),
             func.count(func.distinct(Enrollment.enrollment_id)).label("enrolled_courses"),
-            func.max(case((banded, lr.c.risk_score))).label("highest_risk_score"),
+            func.max(scored_risk(lr.c.risk_score, lr.c.risk_category)).label(
+                "highest_risk_score"
+            ),
             func.sum(case((lr.c.risk_category == "HIGH", 1), else_=0)).label("high_risk_courses"),
             func.sum(case((lr.c.risk_category == "MEDIUM", 1), else_=0)).label(
                 "medium_risk_courses"
@@ -493,7 +509,9 @@ def course_stats_sq(window_days: int = 30) -> Subquery:
             func.sum(case((lr.c.risk_category == "MEDIUM", 1), else_=0)).label(
                 "medium_risk_count"
             ),
-            func.round(func.avg(lr.c.risk_score), 2).label("avg_risk_score"),
+            func.round(func.avg(scored_risk(lr.c.risk_score, lr.c.risk_category)), 2).label(
+                "avg_risk_score"
+            ),
         )
         .select_from(Enrollment)
         .outerjoin(att, att.c.enrollment_id == Enrollment.enrollment_id)

@@ -4,6 +4,8 @@
 #
 #   ./setup.sh            install dependencies only
 #   ./setup.sh --db       also create the MySQL schema and demo data
+#                         (asks first if se_ewrs already holds tables:
+#                         loading it drops and recreates every one)
 #
 # The --db step needs a MySQL account that can create a database. Its
 # password is asked for once and never stored. Set MYSQL_USER to use a
@@ -78,13 +80,58 @@ if $LOAD_DB; then
   fi
   export MYSQL_PWD="$MYSQL_PASSWORD"
 
+  # schema.sql drops and recreates every table, so loading over an existing
+  # se_ewrs destroys whatever it holds. Say exactly what would go, and go
+  # ahead only on an explicit answer: typing the database name, or, with no
+  # terminal to ask on, SE_EWRS_CONFIRM_RESET=se_ewrs. Nothing defaults to yes.
+  existing_tables="$(mysql -u "$MYSQL_USER" -N -B -e \
+    "SELECT COUNT(*) FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = 'se_ewrs' AND TABLE_TYPE = 'BASE TABLE'")"
+  if [[ "$existing_tables" -gt 0 ]]; then
+    printf '\n\033[1;31mWARNING: database se_ewrs already exists with %s tables.\033[0m\n' "$existing_tables"
+    echo "Continuing DROPS AND RECREATES every table; all data in them is lost:"
+    mysql -u "$MYSQL_USER" -N -B -e \
+      "SELECT CONCAT('    ', TABLE_NAME, ': ~', TABLE_ROWS, ' rows')
+         FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = 'se_ewrs' AND TABLE_TYPE = 'BASE TABLE'
+          AND TABLE_NAME IN ('students', 'enrollments', 'assessment_results',
+                             'risk_alerts', 'interventions', 'users')
+        ORDER BY TABLE_NAME"
+    echo "(Row counts are InnoDB estimates. Back up first with:"
+    echo "    mysqldump -u ${MYSQL_USER} -p se_ewrs > se_ewrs-backup.sql )"
+    if [[ "${SE_EWRS_CONFIRM_RESET:-}" == "se_ewrs" ]]; then
+      echo "SE_EWRS_CONFIRM_RESET=se_ewrs is set; continuing."
+    elif [[ -t 0 ]]; then
+      read -rp "Type the database name (se_ewrs) to destroy and reload it, anything else to stop: " answer
+      if [[ "$answer" != "se_ewrs" ]]; then
+        echo "Stopped. The database was not touched."
+        exit 1
+      fi
+    else
+      echo "Stopped: no terminal to confirm on. The database was not touched." >&2
+      echo "Set SE_EWRS_CONFIRM_RESET=se_ewrs to reload it unattended." >&2
+      exit 1
+    fi
+  fi
+
   cd "$ROOT"
   # Order matters: schema creates the database, and every script carries
   # its own USE statement, so no database name is needed here.
-  for script in schema views procedures triggers seed; do
+  for script in schema views procedures triggers; do
     echo "  applying database/${script}.sql"
     mysql -u "$MYSQL_USER" < "database/${script}.sql"
   done
+
+  # seed.sql scores every enrolment through the stored procedure, which
+  # returns one result set per enrolment: ~180 lines of tables. Keep them
+  # in a log instead of the terminal. Errors still go to stderr, and a
+  # failed load still stops the script.
+  seed_log="$(mktemp "${TMPDIR:-/tmp}/se-ewrs-seed.XXXXXX.log")"
+  echo "  applying database/seed.sql (full output: ${seed_log})"
+  mysql -u "$MYSQL_USER" < database/seed.sql > "$seed_log"
+  echo "  rows loaded:"
+  # The header row of the seed's own count summary, and the counts under it.
+  sed -n '/^students\t/{N;p}' "$seed_log" | sed 's/^/    /'
 
   # Confirm the load rather than just reporting that mysql exited 0.
   echo "  risk distribution after seeding:"
@@ -100,7 +147,8 @@ say "Done"
 cat <<'NEXT'
 Next steps:
 
-  1. If you have not loaded the database yet:
+  1. If you have not loaded the database yet (schema.sql DROPS every table
+     of an existing se_ewrs, so do not run it over data you want to keep):
          mysql -u root -p < database/schema.sql
          mysql -u root -p se_ewrs < database/views.sql
          mysql -u root -p se_ewrs < database/procedures.sql

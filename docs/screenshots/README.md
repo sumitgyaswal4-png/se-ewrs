@@ -6,6 +6,10 @@ a mock-up: every figure in every image was produced by the backend from the
 database, so the numbers agree across images (41 low, 26 medium, 9 high and
 4 needing more data).
 
+Images 12 and 15 were re-taken on **2026-10-29**, with the CSV beside them,
+when report means stopped counting the partial score an unscored profile
+stores: the *Needs more data* row's mean now reads "—" instead of 20.0.
+
 They are taken at a 1440 × 980 viewport and stored at 1× for the written
 report, which is why the long pages are tall.
 

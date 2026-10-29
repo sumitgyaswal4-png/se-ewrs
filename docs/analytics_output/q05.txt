@@ -1,0 +1,39 @@
++------------+-----------------+-------------+-------------+------------+
+| student_id | student_name    | course_code | student_avg | course_avg |
++------------+-----------------+-------------+-------------+------------+
+| MTH2024008 | Aisha Menon     | CSE202      |       20.18 |      57.50 |
+| MTH2024023 | Omar Joshi      | CSE202      |       37.96 |      57.50 |
+| MTH2024009 | Raghav Rao      | CSE202      |       39.77 |      57.50 |
+| MTH2024001 | Raghav Trivedi  | CSE202      |       44.19 |      57.50 |
+| MTH2024014 | Rohan Dutta     | CSE202      |       45.97 |      57.50 |
+| MTH2024019 | Veer Agarwal    | CSE202      |       51.97 |      57.50 |
+| MTH2024023 | Omar Joshi      | MTH201      |       18.75 |      59.85 |
+| MTH2024008 | Aisha Menon     | MTH201      |       20.70 |      59.85 |
+| PHY2024002 | Arjun Agarwal   | MTH201      |       31.66 |      59.85 |
+| MTH2024001 | Raghav Trivedi  | MTH201      |       41.21 |      59.85 |
+| MTH2024019 | Veer Agarwal    | MTH201      |       45.82 |      59.85 |
+| MTH2024018 | Rohan Patel     | MTH201      |       57.70 |      59.85 |
+| PHY2024002 | Arjun Agarwal   | MTH210      |       14.65 |      60.70 |
+| MTH2024008 | Aisha Menon     | MTH210      |       29.17 |      60.70 |
+| MTH2024001 | Raghav Trivedi  | MTH210      |       42.92 |      60.70 |
+| MTH2024014 | Rohan Dutta     | MTH210      |       45.41 |      60.70 |
+| MTH2024018 | Rohan Patel     | MTH210      |       47.04 |      60.70 |
+| MTH2024009 | Raghav Rao      | MTH210      |       47.62 |      60.70 |
+| CSE2024006 | Harsh Mehta     | MTH210      |       51.00 |      60.70 |
+| MTH2024019 | Veer Agarwal    | MTH210      |       55.52 |      60.70 |
+| MTH2023024 | Pooja Shetty    | MTH305      |       14.47 |      56.45 |
+| STA2023003 | Sara Ghosh      | MTH305      |       18.14 |      56.45 |
+| MTH2023020 | Raghav Sheikh   | MTH305      |       38.72 |      56.45 |
+| MTH2023015 | Rohan Bose      | MTH305      |       39.09 |      56.45 |
+| MTH2023002 | Juhi Ansari     | MTH305      |       45.50 |      56.45 |
+| STA2023004 | Veer Kapoor     | MTH305      |       46.50 |      56.45 |
+| CSE2023001 | Meera Kapoor    | MTH305      |       47.86 |      56.45 |
+| MTH2023007 | Tara Ansari     | MTH305      |       55.69 |      56.45 |
+| MTH2022021 | Kabir Shetty    | MTH401      |       63.23 |      78.94 |
+| PHY2022001 | Vihaan Kulkarni | MTH401      |       78.14 |      78.94 |
+| MTH2023024 | Pooja Shetty    | STA301      |        9.54 |      52.36 |
+| STA2023003 | Sara Ghosh      | STA301      |       23.40 |      52.36 |
+| MTH2023020 | Raghav Sheikh   | STA301      |       32.25 |      52.36 |
+| STA2023004 | Veer Kapoor     | STA301      |       35.06 |      52.36 |
+| CSE2023001 | Meera Kapoor    | STA301      |       40.70 |      52.36 |
++------------+-----------------+-------------+-------------+------------+

@@ -2,6 +2,8 @@
 
 from datetime import date, timedelta
 
+import pytest
+
 
 def test_root_banner(client):
     response = client.get("/")
@@ -252,3 +254,92 @@ def test_a_sql_injection_attempt_in_search_is_treated_as_text(client, as_admin, 
 
     # and the table is still there
     assert client.get("/api/students", headers=as_admin).json()["total"] == 3
+
+
+def test_env_file_does_not_depend_on_the_working_directory():
+    """Started from the repo root, a relative ``.env`` would be missed and
+    tokens signed with the public default secret."""
+    from pathlib import Path
+
+    from app.core.config import Settings
+
+    env_file = Path(Settings.model_config["env_file"])
+    assert env_file.is_absolute()
+    assert env_file == Path(__file__).resolve().parents[1] / ".env"
+
+
+@pytest.mark.parametrize(
+    "key, reason",
+    [
+        (None, "SECRET_KEY is not set"),
+        ("", "SECRET_KEY is not set"),
+        ("generate-a-new-random-value-do-not-use-this-one", "placeholder"),
+        ("CHANGE-ME-IN-DOT-ENV-this-default-is-for-local-dev-only", "placeholder"),
+        ("short-but-random-1234", "at least 32 characters"),
+    ],
+)
+def test_startup_refuses_a_missing_or_known_secret_key(monkeypatch, key, reason):
+    """A key anyone can read lets anyone mint an admin token, so there is no
+    default to fall back on; outside DEBUG a bad key stops the process."""
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    overrides = {} if key is None else {"secret_key": key}
+    with pytest.raises(ValidationError, match=reason):
+        Settings(_env_file=None, debug=False, **overrides)
+
+
+def test_debug_without_a_key_gets_a_private_temporary_one(monkeypatch):
+    from app.core.config import Settings
+
+    monkeypatch.delenv("SECRET_KEY", raising=False)
+    first = Settings(_env_file=None, debug=True).secret_key
+    second = Settings(_env_file=None, debug=True).secret_key
+    assert len(first) >= 32 and first != second
+
+
+def test_debug_does_not_excuse_a_placeholder_key(monkeypatch):
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError, match="placeholder"):
+        Settings(
+            _env_file=None,
+            debug=True,
+            secret_key="generate-a-new-random-value-do-not-use-this-one",
+        )
+
+
+@pytest.mark.parametrize("password", ["p@ss:w/rd#1", "50%off?x=y&z", "plain", ""])
+def test_database_credentials_are_url_encoded(monkeypatch, password):
+    """A raw ``@`` or ``/`` in the password used to move the host and path."""
+    from sqlalchemy.engine import make_url
+
+    from app.core.config import Settings
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    built = Settings(
+        _env_file=None,
+        secret_key="x" * 40,
+        db_user="app@user",
+        db_password=password,
+        db_host="db.internal",
+        db_port=3307,
+        db_name="se_ewrs",
+    )
+    url = make_url(built.sqlalchemy_url)
+    assert (url.username, url.password or "") == ("app@user", password)
+    assert (url.host, url.port, url.database) == ("db.internal", 3307, "se_ewrs")
+    assert url.query == {"charset": "utf8mb4"}
+
+
+def test_the_seed_cli_never_prints_part_of_a_password():
+    from app.db.seed import _mask
+
+    printed = _mask("mysql+pymysql://app:se%40cret%2Ftail@db.internal:3306/se_ewrs")
+    assert "cret" not in printed and "tail" not in printed
+    assert printed == "mysql+pymysql://app:***@db.internal:3306/se_ewrs"
+    assert "hunter2" not in _mask("not a url hunter2")

@@ -113,14 +113,18 @@ class RiskConfig:
             raw = rows.get(key)
             if raw is None:
                 return fallback
+            # fn_setting_num reads every setting as DECIMAL(10,4), rounding
+            # half-up; doing the same here keeps 0.33335 from scoring
+            # differently in the two implementations.
             try:
-                return Decimal(str(raw))
+                return Decimal(str(raw)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
             except (ArithmeticError, ValueError):
                 return fallback
 
         def integer(key: str, fallback: int) -> int:
+            # CAST(... AS SIGNED) rounds, so 30.5 is 31 in SQL; int() would truncate to 30.
             try:
-                return int(num(key, Decimal(fallback)))
+                return _q0(num(key, Decimal(fallback)))
             except (ArithmeticError, ValueError):
                 return fallback
 

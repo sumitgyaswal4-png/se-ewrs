@@ -27,15 +27,17 @@ SELECT
 FROM student_risk_summary;
 
 -- ---------------------------------------------------------------------
--- Q2. Students grouped by risk category, worst first.
+-- Q2. Enrolments grouped by risk category, worst first.
 -- Concepts: join across 4 tables via a view, ORDER BY on a derived col.
+-- An INSUFFICIENT_DATA row stores a partial score, not an assessment, so
+-- its statistics are NULL here and it is left out of every mean below.
 -- ---------------------------------------------------------------------
-SELECT 'Q2: students by risk category' AS query_label;
+SELECT 'Q2: enrolments by risk category' AS query_label;
 SELECT risk_category,
-       COUNT(*)                        AS students,
-       ROUND(AVG(risk_score), 2)       AS avg_score,
-       ROUND(MIN(risk_score), 2)       AS min_score,
-       ROUND(MAX(risk_score), 2)       AS max_score
+       COUNT(*)                        AS enrollments,
+       ROUND(AVG(CASE WHEN risk_category IN ('LOW', 'MEDIUM', 'HIGH') THEN risk_score END), 2) AS avg_score,
+       ROUND(MIN(CASE WHEN risk_category IN ('LOW', 'MEDIUM', 'HIGH') THEN risk_score END), 2) AS min_score,
+       ROUND(MAX(CASE WHEN risk_category IN ('LOW', 'MEDIUM', 'HIGH') THEN risk_score END), 2) AS max_score
 FROM student_risk_summary
 GROUP BY risk_category
 ORDER BY FIELD(risk_category, 'HIGH', 'MEDIUM', 'LOW', 'INSUFFICIENT_DATA');
@@ -122,7 +124,8 @@ SELECT student_semester                      AS semester,
        SUM(risk_category = 'MEDIUM')         AS medium_risk,
        SUM(risk_category = 'HIGH')           AS high_risk,
        SUM(risk_category = 'INSUFFICIENT_DATA') AS insufficient_data,
-       ROUND(AVG(risk_score), 2)             AS avg_risk_score
+       ROUND(AVG(CASE WHEN risk_category IN ('LOW', 'MEDIUM', 'HIGH')
+                      THEN risk_score END), 2) AS avg_risk_score
 FROM student_risk_summary
 GROUP BY student_semester
 ORDER BY student_semester;
@@ -166,7 +169,8 @@ SELECT intervention_type,
        SUM(outcome = 'ESCALATED')          AS escalated,
        SUM(outcome = 'DECLINED')           AS declined,
        ROUND(100.0 * SUM(outcome = 'IMPROVED') / COUNT(*), 2) AS improvement_rate,
-       ROUND(AVG(current_risk_score), 2)   AS avg_current_risk
+       ROUND(AVG(CASE WHEN current_risk_category IN ('LOW', 'MEDIUM', 'HIGH')
+                      THEN current_risk_score END), 2) AS avg_current_risk
 FROM v_intervention_outcomes
 GROUP BY intervention_type
 HAVING COUNT(*) > 0

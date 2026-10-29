@@ -425,12 +425,14 @@ Full reference with request/response examples:
 | **No hash exposure** | `password_hash` appears in no response schema — asserted against the generated OpenAPI document by a test. |
 | **JWT with expiry** | HS256, 8-hour default. The role claim is re-checked against the database row on every request, so a role change or de-activation takes effect immediately. |
 | **Server-side authorisation** | Named permissions on every endpoint. Asserted for every (role, endpoint) pair in `test_rbac.py`. |
-| **No account enumeration** | An unknown email and a wrong password return the identical 401. Both are audited. |
+| **No account enumeration** | An unknown email and a wrong password return the identical 401 and cost the same Argon2 verification, so neither the message nor the response time reveals whether an account exists. Both are audited. |
+| **Login throttling** | 5 failed sign-ins for one email, or 20 from one client address, within 15 minutes, and further attempts get a 429 with `Retry-After` until the oldest failure ages out. Each attempt is counted before its password is checked, so a burst of parallel requests cannot exceed the limit; a correct password hands its slot back. A blocked attempt does no database or Argon2 work and writes no audit row. Counts are per process (one uvicorn worker); behind a reverse proxy, run uvicorn with `--proxy-headers`. Tunable with `LOGIN_MAX_FAILURES_PER_ACCOUNT`, `LOGIN_MAX_FAILURES_PER_ADDRESS` and `LOGIN_FAILURE_WINDOW_SECONDS`. |
+| **CSV exports** | Any text cell starting with `=`, `+`, `-`, `@`, tab or CR is prefixed with `'`, so a name entered as a spreadsheet formula opens as plain text. |
 | **SQL injection** | All access through SQLAlchemy with bound parameters. Even sortable column names are validated against an allowlist rather than interpolated — `test_system.py` fires an injection payload at the search endpoint and asserts it is treated as a literal string. |
 | **Input validation** | Pydantic on every request body and query parameter, with database `CHECK` constraints behind it. |
 | **Safe errors** | Internal failures are logged in full server-side; the client receives a generic message. Validation errors name the field but never echo the submitted value. |
 | **Audit logging** | Application events plus trigger-captured row changes. Passwords are redacted by the audit helper and never written by a trigger. |
-| **Secrets** | Environment variables only. `.env` is git-ignored; `.env.example` ships placeholders. `setup.sh` generates a fresh `SECRET_KEY`. |
+| **Secrets** | Environment variables only. `.env` is git-ignored; `.env.example` ships placeholders. `setup.sh` generates a fresh `SECRET_KEY`. There is no built-in fallback key: the backend refuses to start if `SECRET_KEY` is missing, shorter than 32 characters or still the placeholder. Only with `DEBUG=true` and no key does it generate a temporary one for that process. |
 | **FK validation** | Enforced by MySQL; `PRAGMA foreign_keys=ON` is set per connection on SQLite so the test-suite enforces them too. |
 
 **Before any real deployment:** generate a new `SECRET_KEY`, change every
@@ -457,11 +459,19 @@ cd se-ewrs
 ./setup.sh --db     # …and create the schema and demo data
 ```
 
+> **`--db` replaces an existing `se_ewrs` database.** `schema.sql` drops and
+> recreates every table. If `se_ewrs` already holds tables, `setup.sh` lists
+> what would be lost and continues only when you type the database name. With
+> no terminal to ask on, it stops unless `SE_EWRS_CONFIRM_RESET=se_ewrs` is set.
+> Back up first with `mysqldump -u root -p se_ewrs > se_ewrs-backup.sql`.
+
 ### Manual setup
 
 **1 — Create the database and load everything**
 
 Run the five scripts **in this order**; they are not independent.
+`schema.sql` **drops every table** of an existing `se_ewrs`, so run it only
+on a database whose contents you do not need.
 
 ```bash
 mysql -u root -p < database/schema.sql        # creates the se_ewrs database
@@ -470,6 +480,11 @@ mysql -u root -p se_ewrs < database/procedures.sql
 mysql -u root -p se_ewrs < database/triggers.sql
 mysql -u root -p se_ewrs < database/seed.sql  # demo data; calls the procedure
 ```
+
+Before that, `seed.sql` prints one small result table per enrolment as
+the stored procedure scores it (about 180 lines). Redirect the output,
+`… < database/seed.sql > seed.log`, to keep the terminal clear; errors
+still appear, and `./setup.sh --db` does this for you.
 
 `seed.sql` finishes by printing a row count and the risk distribution, so
 you can confirm it worked:
@@ -592,7 +607,7 @@ dates, so the demo stays current whenever it is loaded.
 
 ## 15. Testing
 
-### Backend — 483 tests, 93% coverage
+### Backend — 526 tests, 93% coverage
 
 ```bash
 cd backend
@@ -607,9 +622,9 @@ and every router under test are the same code that runs against MySQL.
 
 | File | Tests | Covers |
 |---|---|---|
-| `test_auth.py` | 19 | Sign-in, tokens, expiry, forged signatures, hashing, no hash exposure |
+| `test_auth.py` | 31 | Sign-in, tokens, expiry, forged signatures, hashing, no hash exposure, failed-login throttling |
 | `test_rbac.py` | 96 | Every (role, endpoint) pair against the permission matrix |
-| `test_risk_engine.py` | 47 | The formula, bands, clamping, rounding, engagement rules, **missing-data handling** |
+| `test_risk_engine.py` | 48 | The formula, bands, clamping, rounding, engagement rules, **missing-data handling** |
 | `test_students.py` | 21 | CRUD, search, filters, sorting, soft delete, profile |
 | `test_courses.py` | 17 | CRUD, instructor assignment, roster, term uniqueness |
 | `test_enrollments.py` | 16 | Duplicate prevention, bulk skip, status changes |
@@ -618,10 +633,11 @@ and every router under test are the same code that runs against MySQL.
 | `test_risk_api.py` | 20 | Recalculation, the table, the explanation, weight re-normalisation |
 | `test_alerts.py` | 30 | Generation, **duplicate prevention at the constraint**, transitions, auto-resolution |
 | `test_interventions.py` | 22 | Recording, alert linkage, date validation, follow-up queue |
-| `test_reports.py` | 27 | Report accuracy against hand-computed figures, CSV export |
-| `test_system.py` | 23 | Health, settings validation, audit trail, error envelopes, SQL-injection payload |
+| `test_reports.py` | 36 | Report accuracy against hand-computed figures, CSV export and its formula escaping |
+| `test_system.py` | 36 | Health, settings validation, audit trail, error envelopes, SQL-injection payload, startup `SECRET_KEY` checks, database URL encoding |
 | `test_seed.py` | 27 | Demo dataset properties, risk spread, reseed idempotency |
 | `test_api_docs.py` | 76 | Every served endpoint is documented; every documented permission matches what is enforced |
+| `test_report_docs.py` | 8 | The written report: appendices match the files they copy; figures, tables, citations and contents are numbered, listed and resolve |
 
 **`test_api_docs.py` checks the documentation itself.** It reads the
 routes off the running app and the tables out of
@@ -665,7 +681,7 @@ se-ewrs/
 │   │   ├── schemas/      Pydantic request/response models
 │   │   ├── services/     risk_engine, queries, audit, assessment rules
 │   │   └── main.py       application entry point
-│   ├── tests/            483 tests
+│   ├── tests/            526 tests
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
@@ -692,7 +708,11 @@ se-ewrs/
 │   ├── database_design.md    design decisions, risk spec, full SQL reference
 │   ├── api_documentation.md  endpoint reference with examples
 │   ├── user_guide.md         guide for the five staff roles
-│   ├── report.md             the full written report (nine chapters)
+│   ├── report.md             the full written report: front matter, nine chapters, references
+│   ├── report_appendices.md  Appendices A–E (generated — do not edit by hand)
+│   ├── build_appendices.py   regenerates the appendices; --capture re-runs the queries
+│   ├── analytics_output/     captured MySQL output of the 15 queries, for Appendix C
+│   ├── figures/              rendered ER diagrams for the report, and their renderer
 │   ├── report_outline.md     chapter skeleton for the written submission
 │   └── screenshots/          15 captioned screenshots of the running app
 ├── .env.example
@@ -937,7 +957,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 483 backend tests pass (93% coverage); 92 frontend tests pass
+- 526 backend tests pass (93% coverage); 92 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a
