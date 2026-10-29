@@ -919,11 +919,20 @@ is described in §7.6.
 
 ### 7.5 Coverage
 
-83% of backend statements. What is uncovered is mostly defensive
-branches — database error handlers that require provoking a failure
-mid-transaction — and the application startup path. The risk engine,
-which is the part whose correctness matters most, is covered by 47
-dedicated tests plus the SQL-agreement check.
+**93%** of backend statements: 3,678 statements, 270 uncovered.
+
+What remains uncovered is concentrated in four modules, none of them the
+model:
+
+| Module | Covered | What is missed |
+|---|---|---|
+| `app/api/activity.py` | 61% | Administrative paths the demonstration does not exercise |
+| `app/api/auth.py` | 69% | Account-management branches |
+| `app/db/session.py` | 74% | Connection setup |
+| `app/core/exceptions.py` | 86% | Handlers reachable only by provoking a database failure mid-transaction |
+
+The risk engine, which is the part whose correctness matters most, is
+covered by 47 dedicated tests plus the SQL-agreement check of §5.6.
 
 ### 7.6 Defects found during testing
 

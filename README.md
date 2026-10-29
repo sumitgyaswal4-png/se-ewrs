@@ -592,7 +592,7 @@ dates, so the demo stays current whenever it is loaded.
 
 ## 15. Testing
 
-### Backend — 483 tests, 83% coverage
+### Backend — 483 tests, 93% coverage
 
 ```bash
 cd backend
@@ -937,7 +937,7 @@ page loads — with no console errors, page errors or failed requests**.
 
 **Independently of the database:**
 
-- 483 backend tests pass (83% coverage); 92 frontend tests pass
+- 483 backend tests pass (93% coverage); 92 frontend tests pass
 - The production build succeeds
 
 **Under concurrency** (real threads against real MySQL, released from a
